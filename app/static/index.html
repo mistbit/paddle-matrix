@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频字幕OCR识别</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', system-ui, sans-serif; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        .slide-enter-active, .slide-leave-active { transition: all 0.3s ease; }
+        .slide-enter-from, .slide-leave-to { transform: translateY(-10px); opacity: 0; }
+        .progress-bar { transition: width 0.5s ease; }
+        .drop-zone.dragover { border-color: #3b82f6; background-color: #eff6ff; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-pulse-custom { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .subtitle-line:hover { background-color: #f3f4f6; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2M17 4V2M3 8h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6M9 16h6"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-900">视频字幕OCR识别</h1>
+                            <p class="text-xs text-gray-500">基于PaddleOCR的智能字幕提取</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                              :class="serverStatus === 'online' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                            <span class="w-2 h-2 rounded-full mr-2"
+                                  :class="serverStatus === 'online' ? 'bg-green-500' : 'bg-red-500'"></span>
+                            {{ serverStatus === 'online' ? '服务正常' : '服务离线' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Upload Section -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">上传视频</h2>
+
+                <!-- Drop Zone -->
+                <div class="drop-zone relative border-2 border-dashed border-gray-300 rounded-xl p-8 text-center transition-all cursor-pointer hover:border-blue-400 hover:bg-blue-50/50"
+                     :class="{ 'dragover': isDragging }"
+                     @dragover.prevent="isDragging = true"
+                     @dragleave.prevent="isDragging = false"
+                     @drop.prevent="handleDrop"
+                     @click="$refs.fileInput.click()">
+                    <input type="file" ref="fileInput" class="hidden" accept="video/*" @change="handleFileSelect">
+
+                    <div v-if="!selectedFile" class="space-y-3">
+                        <div class="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-gray-600">拖放视频文件到这里，或 <span class="text-blue-600 font-medium">点击选择</span></p>
+                            <p class="text-sm text-gray-400 mt-1">支持 MP4, AVI, MOV, MKV, WebM 格式，最大 500MB</p>
+                        </div>
+                    </div>
+
+                    <div v-else class="space-y-3">
+                        <div class="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-gray-900 font-medium">{{ selectedFile.name }}</p>
+                            <p class="text-sm text-gray-500">{{ formatFileSize(selectedFile.size) }}</p>
+                        </div>
+                        <button @click.stop="clearFile" class="text-red-600 hover:text-red-700 text-sm font-medium">
+                            清除选择
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">语言</label>
+                        <select v-model="options.language" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="auto">自动检测</option>
+                            <option value="ch">中文</option>
+                            <option value="en">英文</option>
+                            <option value="korean">韩文</option>
+                            <option value="japan">日文</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">采样间隔 (秒)</label>
+                        <input type="number" v-model.number="options.sampleInterval" min="0.5" max="10" step="0.5"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">合并阈值</label>
+                        <input type="number" v-model.number="options.mergeThreshold" min="0" max="1" step="0.1"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-center space-x-4">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" v-model="options.detectRegion" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <span class="text-sm text-gray-700">自动检测字幕区域</span>
+                    </label>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="mt-6 flex justify-end space-x-4">
+                    <button v-if="!isProcessing" @click="startExtraction"
+                            :disabled="!selectedFile"
+                            class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/25">
+                        开始提取
+                    </button>
+                    <button v-else @click="cancelExtraction"
+                            class="px-6 py-3 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition-all">
+                        取消任务
+                    </button>
+                </div>
+            </div>
+
+            <!-- Processing Status -->
+            <transition name="slide">
+                <div v-if="currentTask" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-gray-900">处理状态</h2>
+                        <span class="px-3 py-1 rounded-full text-sm font-medium"
+                              :class="{
+                                  'bg-yellow-100 text-yellow-800': currentTask.status === 'pending',
+                                  'bg-blue-100 text-blue-800': currentTask.status === 'processing',
+                                  'bg-green-100 text-green-800': currentTask.status === 'completed',
+                                  'bg-red-100 text-red-800': currentTask.status === 'failed'
+                              }">
+                            {{ getStatusText(currentTask.status) }}
+                        </span>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm text-gray-600 mb-1">
+                            <span>处理进度</span>
+                            <span>{{ currentTask.progress }}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                            <div class="progress-bar h-full rounded-full transition-all"
+                                 :class="{
+                                     'bg-blue-500': currentTask.status === 'processing',
+                                     'bg-green-500': currentTask.status === 'completed',
+                                     'bg-red-500': currentTask.status === 'failed'
+                                 }"
+                                 :style="{ width: currentTask.progress + '%' }"></div>
+                        </div>
+                    </div>
+
+                    <!-- Task Info -->
+                    <div v-if="currentTask.result" class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <p class="text-gray-500">视频时长</p>
+                            <p class="font-semibold text-gray-900">{{ formatDuration(currentTask.result.duration) }}</p>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <p class="text-gray-500">处理帧数</p>
+                            <p class="font-semibold text-gray-900">{{ currentTask.result.processed_frames }} / {{ currentTask.result.total_frames }}</p>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <p class="text-gray-500">字幕数量</p>
+                            <p class="font-semibold text-gray-900">{{ currentTask.result.subtitles?.length || 0 }}</p>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <p class="text-gray-500">检测语言</p>
+                            <p class="font-semibold text-gray-900">{{ getLanguageText(currentTask.result.detected_language) }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Error Message -->
+                    <div v-if="currentTask.error" class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <p class="text-red-800 font-medium">错误信息</p>
+                        <p class="text-red-600 text-sm mt-1">{{ currentTask.error }}</p>
+                    </div>
+                </div>
+            </transition>
+
+            <!-- Results Section -->
+            <transition name="slide">
+                <div v-if="currentTask && currentTask.status === 'completed' && currentTask.result" class="space-y-6">
+                    <!-- Subtitle Preview -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-lg font-semibold text-gray-900">字幕预览</h2>
+                            <div class="flex space-x-2">
+                                <button @click="copySrt" class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                                    <span class="flex items-center space-x-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                        </svg>
+                                        <span>复制</span>
+                                    </span>
+                                </button>
+                                <button @click="downloadSrt" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                    <span class="flex items-center space-x-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                        </svg>
+                                        <span>下载SRT</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Subtitle List -->
+                        <div class="max-h-96 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                            <div v-for="sub in currentTask.result.subtitles" :key="sub.index"
+                                 class="subtitle-line p-4 flex items-start space-x-4 transition-colors">
+                                <span class="text-xs font-mono text-gray-400 w-8">{{ sub.index }}</span>
+                                <div class="flex-1">
+                                    <p class="text-xs text-gray-500 font-mono mb-1">
+                                        {{ formatSrtTime(sub.start_time) }} --> {{ formatSrtTime(sub.end_time) }}
+                                    </p>
+                                    <p class="text-gray-900">{{ sub.text }}</p>
+                                </div>
+                                <span class="text-xs text-gray-400">{{ Math.round(sub.confidence * 100) }}%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SRT Content -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-4">SRT内容</h2>
+                        <pre class="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono max-h-64 overflow-y-auto">{{ currentTask.result.srt_content }}</pre>
+                    </div>
+                </div>
+            </transition>
+
+            <!-- History Section -->
+            <div v-if="taskHistory.length > 0" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">历史记录</h2>
+                <div class="space-y-3">
+                    <div v-for="task in taskHistory" :key="task.id"
+                         class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                         @click="loadTask(task)">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-900">{{ task.fileName }}</p>
+                                <p class="text-sm text-gray-500">{{ task.timestamp }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <span class="px-2 py-1 rounded text-xs font-medium"
+                                  :class="{
+                                      'bg-green-100 text-green-800': task.status === 'completed',
+                                      'bg-red-100 text-red-800': task.status === 'failed'
+                                  }">
+                                {{ getStatusText(task.status) }}
+                            </span>
+                            <span class="text-sm text-gray-500">{{ task.subtitleCount }} 条字幕</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Toast Notification -->
+        <transition name="fade">
+            <div v-if="toast.show"
+                 class="fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50"
+                 :class="{
+                     'bg-green-500 text-white': toast.type === 'success',
+                     'bg-red-500 text-white': toast.type === 'error',
+                     'bg-blue-500 text-white': toast.type === 'info'
+                 }">
+                {{ toast.message }}
+            </div>
+        </transition>
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, computed, onMounted, watch } = Vue;
+
+        createApp({
+            setup() {
+                // State
+                const serverStatus = ref('offline');
+                const selectedFile = ref(null);
+                const isDragging = ref(false);
+                const isProcessing = ref(false);
+                const currentTask = ref(null);
+                const taskHistory = ref([]);
+                const pollingInterval = ref(null);
+
+                const options = reactive({
+                    language: 'auto',
+                    sampleInterval: 1.0,
+                    mergeThreshold: 0.8,
+                    detectRegion: true
+                });
+
+                const toast = reactive({
+                    show: false,
+                    message: '',
+                    type: 'info'
+                });
+
+                // API Base URL
+                const API_BASE = window.location.origin;
+
+                // Methods
+                const showToast = (message, type = 'info') => {
+                    toast.message = message;
+                    toast.type = type;
+                    toast.show = true;
+                    setTimeout(() => { toast.show = false; }, 3000);
+                };
+
+                const checkServerStatus = async () => {
+                    try {
+                        const response = await fetch(`${API_BASE}/health`);
+                        if (response.ok) {
+                            serverStatus.value = 'online';
+                        } else {
+                            serverStatus.value = 'offline';
+                        }
+                    } catch (error) {
+                        serverStatus.value = 'offline';
+                    }
+                };
+
+                const handleFileSelect = (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        validateAndSetFile(file);
+                    }
+                };
+
+                const handleDrop = (event) => {
+                    isDragging.value = false;
+                    const file = event.dataTransfer.files[0];
+                    if (file) {
+                        validateAndSetFile(file);
+                    }
+                };
+
+                const validateAndSetFile = (file) => {
+                    const validTypes = ['video/mp4', 'video/avi', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/x-matroska'];
+                    const maxSize = 500 * 1024 * 1024; // 500MB
+
+                    if (!validTypes.includes(file.type) && !file.name.match(/\.(mp4|avi|mov|mkv|webm|flv|wmv)$/i)) {
+                        showToast('请选择有效的视频文件', 'error');
+                        return;
+                    }
+
+                    if (file.size > maxSize) {
+                        showToast('文件大小不能超过500MB', 'error');
+                        return;
+                    }
+
+                    selectedFile.value = file;
+                    showToast('文件已选择', 'success');
+                };
+
+                const clearFile = () => {
+                    selectedFile.value = null;
+                };
+
+                const startExtraction = async () => {
+                    if (!selectedFile.value) {
+                        showToast('请先选择视频文件', 'error');
+                        return;
+                    }
+
+                    isProcessing.value = true;
+                    currentTask.value = {
+                        id: null,
+                        status: 'pending',
+                        progress: 0,
+                        result: null,
+                        error: null
+                    };
+
+                    const formData = new FormData();
+                    formData.append('video', selectedFile.value);
+                    formData.append('language', options.language);
+                    formData.append('sample_interval', options.sampleInterval);
+                    formData.append('merge_threshold', options.mergeThreshold);
+                    formData.append('detect_region', options.detectRegion);
+
+                    try {
+                        // Start async extraction
+                        const response = await fetch(`${API_BASE}/api/v1/subtitle/extract/async`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        currentTask.value.id = data.task_id;
+                        currentTask.value.status = 'processing';
+                        showToast('任务已提交，正在处理...', 'info');
+
+                        // Start polling for status
+                        startPolling();
+
+                    } catch (error) {
+                        console.error('Extraction error:', error);
+                        currentTask.value.status = 'failed';
+                        currentTask.value.error = error.message;
+                        showToast('提交失败: ' + error.message, 'error');
+                        isProcessing.value = false;
+                    }
+                };
+
+                const startPolling = () => {
+                    pollingInterval.value = setInterval(async () => {
+                        if (!currentTask.value.id) return;
+
+                        try {
+                            const response = await fetch(`${API_BASE}/api/v1/subtitle/status/${currentTask.value.id}`);
+                            const data = await response.json();
+
+                            currentTask.value.status = data.status;
+                            currentTask.value.progress = data.progress;
+                            currentTask.value.result = data.result;
+                            currentTask.value.error = data.error;
+
+                            if (data.status === 'completed') {
+                                stopPolling();
+                                isProcessing.value = false;
+                                showToast('字幕提取完成！', 'success');
+                                addToHistory();
+                            } else if (data.status === 'failed') {
+                                stopPolling();
+                                isProcessing.value = false;
+                                showToast('处理失败: ' + data.error, 'error');
+                            }
+                        } catch (error) {
+                            console.error('Polling error:', error);
+                        }
+                    }, 2000);
+                };
+
+                const stopPolling = () => {
+                    if (pollingInterval.value) {
+                        clearInterval(pollingInterval.value);
+                        pollingInterval.value = null;
+                    }
+                };
+
+                const cancelExtraction = () => {
+                    stopPolling();
+                    currentTask.value = null;
+                    isProcessing.value = false;
+                    showToast('任务已取消', 'info');
+                };
+
+                const addToHistory = () => {
+                    if (!currentTask.value || !selectedFile.value) return;
+
+                    const historyItem = {
+                        id: currentTask.value.id,
+                        fileName: selectedFile.value.name,
+                        timestamp: new Date().toLocaleString(),
+                        status: currentTask.value.status,
+                        subtitleCount: currentTask.value.result?.subtitles?.length || 0,
+                        result: currentTask.value.result
+                    };
+
+                    taskHistory.value.unshift(historyItem);
+                    if (taskHistory.value.length > 10) {
+                        taskHistory.value.pop();
+                    }
+
+                    // Save to localStorage
+                    localStorage.setItem('taskHistory', JSON.stringify(taskHistory.value));
+                };
+
+                const loadTask = (task) => {
+                    currentTask.value = {
+                        id: task.id,
+                        status: task.status,
+                        progress: 100,
+                        result: task.result,
+                        error: null
+                    };
+                };
+
+                const copySrt = () => {
+                    if (currentTask.value?.result?.srt_content) {
+                        navigator.clipboard.writeText(currentTask.value.result.srt_content)
+                            .then(() => showToast('SRT内容已复制到剪贴板', 'success'))
+                            .catch(() => showToast('复制失败', 'error'));
+                    }
+                };
+
+                const downloadSrt = () => {
+                    if (currentTask.value?.result?.srt_content) {
+                        const blob = new Blob([currentTask.value.result.srt_content], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = (selectedFile.value?.name || 'subtitle').replace(/\.[^/.]+$/, '') + '.srt';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        showToast('SRT文件已下载', 'success');
+                    }
+                };
+
+                // Utility functions
+                const formatFileSize = (bytes) => {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                };
+
+                const formatDuration = (seconds) => {
+                    const h = Math.floor(seconds / 3600);
+                    const m = Math.floor((seconds % 3600) / 60);
+                    const s = Math.floor(seconds % 60);
+                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                };
+
+                const formatSrtTime = (seconds) => {
+                    const h = Math.floor(seconds / 3600);
+                    const m = Math.floor((seconds % 3600) / 60);
+                    const s = Math.floor(seconds % 60);
+                    const ms = Math.floor((seconds % 1) * 1000);
+                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+                };
+
+                const getStatusText = (status) => {
+                    const map = {
+                        'pending': '等待中',
+                        'processing': '处理中',
+                        'completed': '已完成',
+                        'failed': '失败'
+                    };
+                    return map[status] || status;
+                };
+
+                const getLanguageText = (lang) => {
+                    const map = {
+                        'auto': '自动检测',
+                        'ch': '中文',
+                        'en': '英文',
+                        'korean': '韩文',
+                        'japan': '日文'
+                    };
+                    return map[lang] || lang;
+                };
+
+                // Lifecycle
+                onMounted(() => {
+                    checkServerStatus();
+                    setInterval(checkServerStatus, 30000);
+
+                    // Load history from localStorage
+                    const savedHistory = localStorage.getItem('taskHistory');
+                    if (savedHistory) {
+                        taskHistory.value = JSON.parse(savedHistory);
+                    }
+                });
+
+                return {
+                    serverStatus,
+                    selectedFile,
+                    isDragging,
+                    isProcessing,
+                    currentTask,
+                    taskHistory,
+                    options,
+                    toast,
+                    handleFileSelect,
+                    handleDrop,
+                    clearFile,
+                    startExtraction,
+                    cancelExtraction,
+                    loadTask,
+                    copySrt,
+                    downloadSrt,
+                    formatFileSize,
+                    formatDuration,
+                    formatSrtTime,
+                    getStatusText,
+                    getLanguageText
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

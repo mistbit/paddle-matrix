@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  subtitle-ocr:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - PADDLEOCR_USE_GPU=false
+      - PADDLEOCR_LANG=ch
+      - VIDEO_MAX_DURATION=7200
+      - DEBUG=false
+    volumes:
+      - ./uploads:/tmp/uploads
+      - ./outputs:/tmp/outputs
+    restart: unless-stopped
