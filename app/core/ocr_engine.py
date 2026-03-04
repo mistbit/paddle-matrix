@@ -95,7 +95,7 @@ class OCREngine:
             rgb_image = image
 
         try:
-            result = ocr.ocr(rgb_image, cls=True)
+            result = ocr.ocr(rgb_image)
         except Exception as e:
             logger.error(f"OCR failed: {e}")
             return []
