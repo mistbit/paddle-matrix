@@ -95,7 +95,7 @@ class OCREngine:
             rgb_image = image
 
         try:
-            result = ocr.ocr(rgb_image)
+            result = ocr.predict(rgb_image)
         except Exception as e:
             logger.error(f"OCR failed: {e}")
             return []
@@ -103,16 +103,30 @@ class OCREngine:
         if not result or not result[0]:
             return []
 
-        detections = []
-        for line in result[0]:
-            box_points = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
-            text = line[1][0]
-            confidence = line[1][1]
+        # PaddleOCR new API returns dict with 'rec_texts', 'rec_scores', 'rec_polys'
+        res = result[0]
+        rec_texts = res.get('rec_texts', [])
+        rec_scores = res.get('rec_scores', [])
+        rec_polys = res.get('rec_polys', [])
 
-            # Convert to (x1, y1, x2, y2) format
-            x_coords = [p[0] for p in box_points]
-            y_coords = [p[1] for p in box_points]
-            box = (min(x_coords), min(y_coords), max(x_coords), max(y_coords))
+        if not rec_texts:
+            return []
+
+        detections = []
+        for i, text in enumerate(rec_texts):
+            if i >= len(rec_scores) or i >= len(rec_polys):
+                break
+
+            confidence = rec_scores[i]
+            poly = rec_polys[i]
+
+            # Convert polygon to bounding box (x1, y1, x2, y2)
+            if len(poly) > 0:
+                x_coords = [p[0] for p in poly]
+                y_coords = [p[1] for p in poly]
+                box = (min(x_coords), min(y_coords), max(x_coords), max(y_coords))
+            else:
+                continue
 
             detections.append({
                 'box': box,
