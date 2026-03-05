@@ -10,8 +10,7 @@ paddlepaddle>=2.5.0
 paddleocr>=2.7.0
 
 # Video Processing
-opencv-python==4.9.0.80
-ffmpeg-python==0.2.0
+opencv-python-headless==4.9.0.80
 numpy==1.26.3
 
 # Utils
