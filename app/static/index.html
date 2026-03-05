@@ -161,6 +161,9 @@
                     <div v-if="activeSubtitleText" class="subtitle-overlay-text">{{ activeSubtitleText }}</div>
                 </div>
                 <p class="text-xs text-gray-500 mt-3">绿色框优先跟随当前字幕检测框变化，无法匹配时回退到自动检测区域。</p>
+                <p class="text-xs mt-1" :class="overlayDebugInfo.usingDynamic ? 'text-green-600' : 'text-amber-600'">
+                    调试：{{ overlayDebugInfo.message }}
+                </p>
             </div>
 
             <!-- Processing Status -->
@@ -611,6 +614,49 @@
                     return activeSubtitle.value ? activeSubtitle.value.text : '';
                 });
 
+                const overlayDebugInfo = computed(() => {
+                    const subtitles = currentTask.value?.result?.subtitles || [];
+                    const anchors = currentTask.value?.result?.anchors || [];
+                    const active = activeSubtitle.value;
+                    const hasActiveBox = Array.isArray(active?.box) && active.box.length === 4;
+                    const boxCount = subtitles.filter(sub => Array.isArray(sub?.box) && sub.box.length === 4).length;
+
+                    if (hasActiveBox) {
+                        return {
+                            usingDynamic: true,
+                            message: `动态框生效（字幕#${active.index}，box=${active.box.join(',')}）`
+                        };
+                    }
+                    if (subtitles.length > 0 && boxCount === 0) {
+                        return {
+                            usingDynamic: false,
+                            message: '当前任务字幕无box（旧结果），请重新提取生成动态框'
+                        };
+                    }
+                    if (active && !hasActiveBox) {
+                        return {
+                            usingDynamic: false,
+                            message: `回退锚框（字幕#${active.index}缺少box）`
+                        };
+                    }
+                    if (!subtitles.length && !anchors.length) {
+                        return {
+                            usingDynamic: false,
+                            message: '暂无字幕与锚框数据'
+                        };
+                    }
+                    if (!subtitles.length && anchors.length) {
+                        return {
+                            usingDynamic: false,
+                            message: `仅有锚框数据（anchors=${anchors.length}）`
+                        };
+                    }
+                    return {
+                        usingDynamic: false,
+                        message: `当前时间未命中字幕，使用锚框显示（box=${boxCount}/${subtitles.length}）`
+                    };
+                });
+
                 const copySrt = () => {
                     if (currentTask.value?.result?.srt_content) {
                         navigator.clipboard.writeText(currentTask.value.result.srt_content)
@@ -718,6 +764,7 @@
                     videoPlayer,
                     videoState,
                     overlayBoxes,
+                    overlayDebugInfo,
                     activeSubtitleText,
                     options,
                     toast,
