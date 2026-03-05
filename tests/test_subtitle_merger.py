@@ -27,3 +27,15 @@ def test_deduplicate_merges_contained_texts():
     dedup = merger.deduplicate_similar(subtitles)
     assert len(dedup) == 2
     assert "妖怪滚回家去" in dedup[0].text
+
+
+def test_merge_detected_texts_keeps_subtitle_box():
+    merger = SubtitleMerger(similarity_threshold=0.8, time_tolerance=0.5, min_duration=0.5)
+    subtitles = merger.merge_detected_texts([
+        DetectedText(text="hello world", confidence=0.91, box=(100, 600, 540, 660), timestamp=2.0, frame_index=10),
+        DetectedText(text="hello world", confidence=0.96, box=(120, 602, 700, 666), timestamp=2.4, frame_index=11),
+        DetectedText(text="next line", confidence=0.88, box=(130, 590, 520, 650), timestamp=4.0, frame_index=20),
+    ])
+    assert len(subtitles) == 2
+    assert subtitles[0].box == (120, 602, 700, 666)
+    assert subtitles[1].box == (130, 590, 520, 650)

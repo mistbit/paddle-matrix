@@ -148,6 +148,11 @@ class SubtitleMerger:
 
         # Select most frequent text
         best_text = max(text_counts.items(), key=lambda x: x[1])[0]
+        best_text_detections = [det for det in group if det.text == best_text]
+        box_source = max(
+            best_text_detections if best_text_detections else group,
+            key=lambda det: det.confidence
+        )
 
         # Calculate average confidence
         avg_confidence = np.mean([d.confidence for d in group])
@@ -162,7 +167,8 @@ class SubtitleMerger:
             start_time=start_time,
             end_time=end_time,
             text=best_text,
-            confidence=avg_confidence
+            confidence=avg_confidence,
+            box=box_source.box
         )
 
     def _adjust_time_boundaries(self, subtitles: List[Subtitle]) -> List[Subtitle]:
@@ -255,6 +261,8 @@ class SubtitleMerger:
                 prev.end_time = current.end_time
                 if len(self._normalize_text(current.text)) > len(self._normalize_text(prev.text)):
                     prev.text = current.text
+                if current.box and (not prev.box or current.confidence >= prev.confidence):
+                    prev.box = current.box
                 prev.confidence = max(prev.confidence, current.confidence)
             else:
                 deduped.append(current)

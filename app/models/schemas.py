@@ -1,7 +1,7 @@
 """Pydantic schemas for API requests and responses"""
 
 from pydantic import BaseModel, Field, validator
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from enum import Enum
 
 
@@ -51,6 +51,10 @@ class SubtitleItem(BaseModel):
     end_time: float = Field(..., description="End time in seconds")
     text: str = Field(..., description="Subtitle text")
     confidence: float = Field(..., ge=0, le=1, description="Confidence score")
+    box: Optional[Tuple[int, int, int, int]] = Field(
+        default=None,
+        description="Subtitle bounding box (x1, y1, x2, y2) in video pixels"
+    )
 
 
 class SubtitleAnchorItem(BaseModel):

@@ -88,7 +88,8 @@ async def extract_subtitles(
                 start_time=sub.start_time,
                 end_time=sub.end_time,
                 text=sub.text,
-                confidence=sub.confidence
+                confidence=sub.confidence,
+                box=sub.box
             )
             for sub in result.subtitles
         ]
@@ -195,7 +196,8 @@ async def extract_subtitles_async(
                     start_time=sub.start_time,
                     end_time=sub.end_time,
                     text=sub.text,
-                    confidence=sub.confidence
+                    confidence=sub.confidence,
+                    box=sub.box
                 )
                 for sub in result.subtitles
             ]
