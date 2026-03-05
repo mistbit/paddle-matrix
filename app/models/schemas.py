@@ -53,11 +53,22 @@ class SubtitleItem(BaseModel):
     confidence: float = Field(..., ge=0, le=1, description="Confidence score")
 
 
+class SubtitleAnchorItem(BaseModel):
+    """Detected subtitle anchor region"""
+    center_x: float = Field(..., ge=0, le=1, description="Anchor center X (normalized)")
+    center_y: float = Field(..., ge=0, le=1, description="Anchor center Y (normalized)")
+    width: float = Field(..., ge=0, le=1, description="Anchor width (normalized)")
+    height: float = Field(..., ge=0, le=1, description="Anchor height (normalized)")
+    confidence: float = Field(..., ge=0, le=1, description="Anchor confidence")
+    language: str = Field(default="auto", description="Anchor language")
+
+
 class SubtitleResponse(BaseModel):
     """Subtitle extraction response"""
     success: bool = Field(..., description="Whether extraction succeeded")
     message: str = Field(default="", description="Status message")
     subtitles: List[SubtitleItem] = Field(default_factory=list, description="Subtitle list")
+    anchors: List[SubtitleAnchorItem] = Field(default_factory=list, description="Detected subtitle regions")
     srt_content: str = Field(default="", description="SRT format subtitle content")
     detected_language: Optional[str] = Field(default=None, description="Detected language")
     total_frames: int = Field(default=0, description="Total frames in video")

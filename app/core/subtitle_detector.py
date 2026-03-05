@@ -2,6 +2,7 @@
 
 import cv2
 import numpy as np
+import re
 from typing import List, Tuple, Optional
 import logging
 
@@ -33,6 +34,8 @@ class SubtitleDetector:
         self.ocr_engine = ocr_engine
         self.min_confidence = settings.SUBTITLE_MIN_CONFIDENCE
         self.roi_bottom_ratio = settings.SUBTITLE_ROI_BOTTOM_RATIO
+        self.min_appearance_ratio = 0.2
+        self.max_anchor_count = 2
 
     def detect_subtitle_region(
         self,
@@ -60,25 +63,165 @@ class SubtitleDetector:
         if not frames:
             return []
 
-        # Collect all detection results
-        all_detections = []
+        all_detections = self._collect_bottom_roi_detections(frames, timestamps)
+        anchors = self._find_stable_regions(
+            all_detections,
+            frames[0].shape,
+            total_frames=len(frames)
+        )
 
+        if not anchors:
+            global_detections = self._collect_full_frame_detections(frames, timestamps)
+            anchors = self._find_stable_regions(
+                global_detections,
+                frames[0].shape,
+                total_frames=len(frames)
+            )
+
+        if not anchors:
+            visual_bands = self._detect_temporal_subtitle_bands(frames)
+            anchors = self._bands_to_anchors(visual_bands, frames[0].shape)
+
+        anchors = sorted(anchors, key=lambda a: a.confidence, reverse=True)[:self.max_anchor_count]
+
+        logger.info(f"Found {len(anchors)} subtitle anchors")
+        return anchors
+
+    def _collect_bottom_roi_detections(
+        self,
+        frames: List[np.ndarray],
+        timestamps: List[float]
+    ) -> List[dict]:
+        all_detections = []
         for idx, (frame, timestamp) in enumerate(zip(frames, timestamps)):
-            # Detect in bottom ROI
             roi_frame, roi_start = self._extract_bottom_roi(frame)
             detections = self.ocr_engine.detect_text(roi_frame)
-
-            # Convert coordinates to original frame coordinate system
             for det in detections:
                 det['abs_box'] = self._roi_to_absolute(det['box'], frame.shape, roi_start)
                 det['frame_idx'] = idx
                 det['timestamp'] = timestamp
                 all_detections.append(det)
+        return all_detections
 
-        # Analyze detection results to find subtitle anchors
-        anchors = self._find_stable_regions(all_detections, frames[0].shape)
+    def _collect_full_frame_detections(
+        self,
+        frames: List[np.ndarray],
+        timestamps: List[float]
+    ) -> List[dict]:
+        all_detections = []
+        if not frames:
+            return all_detections
 
-        logger.info(f"Found {len(anchors)} subtitle anchors")
+        stride = max(1, len(frames) // 8)
+        for idx in range(0, len(frames), stride):
+            frame = frames[idx]
+            timestamp = timestamps[idx]
+            detections = self.ocr_engine.detect_text(frame)
+            frame_height = frame.shape[0]
+            for det in detections:
+                box = det['box']
+                center_y = (box[1] + box[3]) / 2
+                if center_y < frame_height * 0.45:
+                    continue
+                det['abs_box'] = (int(box[0]), int(box[1]), int(box[2]), int(box[3]))
+                det['frame_idx'] = idx
+                det['timestamp'] = timestamp
+                all_detections.append(det)
+        return all_detections
+
+    def _detect_temporal_subtitle_bands(
+        self,
+        frames: List[np.ndarray]
+    ) -> List[Tuple[int, int]]:
+        if not frames:
+            return []
+
+        frame_height, frame_width = frames[0].shape[:2]
+        density = np.zeros(frame_height, dtype=np.float32)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 5))
+
+        for frame in frames:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            top_hat = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, kernel)
+            black_hat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel)
+            enhanced = cv2.addWeighted(top_hat, 0.6, black_hat, 0.4, 0.0)
+            _, binary = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            binary = cv2.morphologyEx(
+                binary,
+                cv2.MORPH_CLOSE,
+                cv2.getStructuringElement(cv2.MORPH_RECT, (15, 3))
+            )
+            row_score = np.sum(binary > 0, axis=1).astype(np.float32) / max(frame_width, 1)
+            density += row_score
+
+        density /= max(len(frames), 1)
+        focus_start = int(frame_height * 0.45)
+        focus_end = int(frame_height * 0.98)
+        focus = density[focus_start:focus_end]
+        if focus.size == 0:
+            return []
+
+        smooth = cv2.GaussianBlur(focus.reshape(-1, 1), (1, 21), 0).reshape(-1)
+        threshold = max(float(np.percentile(smooth, 85)), float(np.mean(smooth) * 1.15))
+        active_rows = np.where(smooth >= threshold)[0]
+        if active_rows.size == 0:
+            return []
+
+        bands = []
+        group = [int(active_rows[0])]
+        for row in active_rows[1:]:
+            row = int(row)
+            if row - group[-1] <= 4:
+                group.append(row)
+            else:
+                center = int(np.mean(group))
+                half = max(int(frame_height * 0.035), 12)
+                y1 = max(focus_start, focus_start + center - half)
+                y2 = min(focus_end, focus_start + center + half)
+                if y2 > y1:
+                    bands.append((y1, y2))
+                group = [row]
+
+        if group:
+            center = int(np.mean(group))
+            half = max(int(frame_height * 0.035), 12)
+            y1 = max(focus_start, focus_start + center - half)
+            y2 = min(focus_end, focus_start + center + half)
+            if y2 > y1:
+                bands.append((y1, y2))
+
+        merged = []
+        for y1, y2 in sorted(bands, key=lambda b: b[0]):
+            if not merged:
+                merged.append([y1, y2])
+                continue
+            prev = merged[-1]
+            if y1 <= prev[1] + 8:
+                prev[1] = max(prev[1], y2)
+            else:
+                merged.append([y1, y2])
+
+        return [(int(y1), int(y2)) for y1, y2 in merged]
+
+    def _bands_to_anchors(
+        self,
+        bands: List[Tuple[int, int]],
+        frame_shape: Tuple[int, int, int]
+    ) -> List[SubtitleAnchor]:
+        frame_height, frame_width = frame_shape[:2]
+        anchors = []
+        for y1, y2 in bands:
+            band_h = max(y2 - y1, 1)
+            anchors.append(
+                SubtitleAnchor(
+                    center_x=0.5,
+                    center_y=((y1 + y2) / 2) / frame_height,
+                    height=min(0.25, band_h / frame_height),
+                    width=0.85,
+                    language=Language.AUTO,
+                    confidence=0.55
+                )
+            )
         return anchors
 
     def _extract_bottom_roi(
@@ -121,7 +264,8 @@ class SubtitleDetector:
     def _find_stable_regions(
         self,
         detections: List[dict],
-        frame_shape: Tuple[int, int, int]
+        frame_shape: Tuple[int, int, int],
+        total_frames: Optional[int] = None
     ) -> List[SubtitleAnchor]:
         """
         Find stable subtitle regions
@@ -155,6 +299,7 @@ class SubtitleDetector:
         y_clusters = self._cluster_by_y_position(detections)
 
         anchors = []
+        observed_frames = max(total_frames or 0, 1)
         for cluster in y_clusters:
             # Calculate average position for the region
             avg_y = np.mean([det['center_y'] for det in cluster])
@@ -162,22 +307,44 @@ class SubtitleDetector:
             avg_width = np.mean([det['width'] for det in cluster])
             avg_x = np.mean([det['center_x'] for det in cluster])
             avg_confidence = np.mean([det['confidence'] for det in cluster])
+            frame_ids = {det['frame_idx'] for det in cluster if 'frame_idx' in det}
+            appearance_ratio = len(frame_ids) / observed_frames
 
-            # Check if in bottom region (subtitles usually at bottom)
-            if avg_y > 0.6 * frame_height:  # Lower 40% of frame
-                # Detect language from text samples
-                texts = [det['text'] for det in cluster]
-                language = self._detect_language(texts)
+            texts = [det.get('text', '') for det in cluster]
+            normalized = [self._normalize_text(t) for t in texts if self._normalize_text(t)]
+            unique_ratio = len(set(normalized)) / max(len(normalized), 1)
+            center_prior = 1.0 - min(1.0, abs((avg_x / frame_width) - 0.5) * 2)
+            width_ratio = avg_width / frame_width
+            height_ratio = avg_height / frame_height
 
-                anchor = SubtitleAnchor(
-                    center_x=avg_x / frame_width,
-                    center_y=avg_y / frame_height,
-                    height=avg_height / frame_height,
-                    width=avg_width / frame_width,
-                    language=language,
-                    confidence=avg_confidence
-                )
-                anchors.append(anchor)
+            score = (
+                0.45 * avg_confidence +
+                0.30 * appearance_ratio +
+                0.15 * unique_ratio +
+                0.10 * center_prior
+            )
+
+            if avg_y <= 0.45 * frame_height:
+                continue
+            if appearance_ratio < self.min_appearance_ratio:
+                continue
+            if width_ratio < 0.12 or width_ratio > 0.98:
+                continue
+            if height_ratio < 0.015 or height_ratio > 0.25:
+                continue
+            if score < max(self.min_confidence * 0.75, 0.5):
+                continue
+
+            language = self._detect_language(texts)
+            anchor = SubtitleAnchor(
+                center_x=avg_x / frame_width,
+                center_y=avg_y / frame_height,
+                height=height_ratio,
+                width=width_ratio,
+                language=language,
+                confidence=min(0.99, score)
+            )
+            anchors.append(anchor)
 
         return anchors
 
@@ -274,6 +441,12 @@ class SubtitleDetector:
             return Language.KOREAN
         else:
             return Language.AUTO
+
+    def _normalize_text(self, text: str) -> str:
+        text = text.strip().lower()
+        text = re.sub(r'\s+', '', text)
+        text = re.sub(r'[^\w\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7a3]', '', text)
+        return text
 
     def refine_anchor(
         self,

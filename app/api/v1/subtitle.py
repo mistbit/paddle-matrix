@@ -10,7 +10,7 @@ import logging
 import uuid
 
 from app.models.schemas import (
-    SubtitleRequest, SubtitleResponse, SubtitleItem,
+    SubtitleRequest, SubtitleResponse, SubtitleItem, SubtitleAnchorItem,
     HealthResponse, AsyncTaskResponse, AsyncTaskStatus, TaskStatus
 )
 from app.services.subtitle_service import SubtitleService
@@ -92,11 +92,23 @@ async def extract_subtitles(
             )
             for sub in result.subtitles
         ]
+        anchor_items = [
+            SubtitleAnchorItem(
+                center_x=anchor.center_x,
+                center_y=anchor.center_y,
+                width=anchor.width,
+                height=anchor.height,
+                confidence=anchor.confidence,
+                language=anchor.language.value
+            )
+            for anchor in result.anchors
+        ]
 
         return SubtitleResponse(
             success=True,
             message="Subtitles extracted successfully",
             subtitles=subtitle_items,
+            anchors=anchor_items,
             srt_content=srt_content,
             detected_language=result.language.value,
             total_frames=result.total_frames,
@@ -187,6 +199,17 @@ async def extract_subtitles_async(
                 )
                 for sub in result.subtitles
             ]
+            anchor_items = [
+                SubtitleAnchorItem(
+                    center_x=anchor.center_x,
+                    center_y=anchor.center_y,
+                    width=anchor.width,
+                    height=anchor.height,
+                    confidence=anchor.confidence,
+                    language=anchor.language.value
+                )
+                for anchor in result.anchors
+            ]
 
             task_results[task_id]['status'] = TaskStatus.COMPLETED
             task_results[task_id]['progress'] = 100
@@ -194,6 +217,7 @@ async def extract_subtitles_async(
                 success=True,
                 message="Subtitles extracted successfully",
                 subtitles=subtitle_items,
+                anchors=anchor_items,
                 srt_content=srt_content,
                 detected_language=result.language.value,
                 total_frames=result.total_frames,

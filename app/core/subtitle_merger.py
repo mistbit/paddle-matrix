@@ -4,6 +4,7 @@ import numpy as np
 from typing import List, Tuple
 from difflib import SequenceMatcher
 import logging
+import re
 
 from app.models.domain import DetectedText, Subtitle
 
@@ -121,8 +122,11 @@ class SubtitleMerger:
         Returns:
             Similarity score (0-1)
         """
-        # Use SequenceMatcher for similarity
-        return SequenceMatcher(None, text1, text2).ratio()
+        norm1 = self._normalize_text(text1)
+        norm2 = self._normalize_text(text2)
+        if not norm1 or not norm2:
+            return 0.0
+        return SequenceMatcher(None, norm1, norm2).ratio()
 
     def _create_subtitle_from_group(self, group: List[DetectedText]) -> Subtitle:
         """
@@ -179,20 +183,21 @@ class SubtitleMerger:
         adjusted = []
 
         for i, sub in enumerate(subtitles):
-            # Ensure minimum duration
+            if i > 0:
+                prev = adjusted[-1]
+                if sub.start_time <= prev.start_time:
+                    sub.start_time = prev.start_time + 0.01
+                if sub.start_time < prev.end_time:
+                    gap = min(0.01, self.min_duration * 0.2)
+                    prev.end_time = max(prev.start_time + 0.05, sub.start_time - gap)
+
+            if sub.end_time <= sub.start_time:
+                sub.end_time = sub.start_time + self.min_duration
+
             duration = sub.end_time - sub.start_time
             if duration < self.min_duration:
                 sub.end_time = sub.start_time + self.min_duration
 
-            # Ensure no overlap with previous subtitle
-            if i > 0:
-                prev = adjusted[-1]
-                if sub.start_time < prev.end_time:
-                    # Adjust start time
-                    sub.start_time = prev.end_time + 0.01
-                    prev.end_time = sub.start_time - 0.01
-
-            # Assign index
             sub.index = i + 1
             adjusted.append(sub)
 
@@ -241,12 +246,16 @@ class SubtitleMerger:
 
         for current in subtitles[1:]:
             prev = deduped[-1]
+            gap = current.start_time - prev.end_time
+            similar = self._text_similarity(current.text, prev.text)
+            contain = self._is_text_contained(current.text, prev.text)
 
-            # If same text and continuous time, merge
-            if (self._text_similarity(current.text, prev.text) > 0.95 and
-                current.start_time - prev.end_time < self.time_tolerance):
-                # Extend previous subtitle's time range
+            if ((similar > 0.92 and gap < self.time_tolerance) or
+                (contain and gap < self.time_tolerance * 1.2)):
                 prev.end_time = current.end_time
+                if len(self._normalize_text(current.text)) > len(self._normalize_text(prev.text)):
+                    prev.text = current.text
+                prev.confidence = max(prev.confidence, current.confidence)
             else:
                 deduped.append(current)
 
@@ -292,3 +301,16 @@ class SubtitleMerger:
             sub.index = i + 1
 
         return merged
+
+    def _normalize_text(self, text: str) -> str:
+        text = text.strip().lower()
+        text = re.sub(r"\s+", "", text)
+        text = re.sub(r"[^\w\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7a3]", "", text)
+        return text
+
+    def _is_text_contained(self, text1: str, text2: str) -> bool:
+        n1 = self._normalize_text(text1)
+        n2 = self._normalize_text(text2)
+        if not n1 or not n2:
+            return False
+        return n1 in n2 or n2 in n1

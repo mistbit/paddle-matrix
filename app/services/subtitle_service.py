@@ -4,6 +4,8 @@ import os
 import logging
 from typing import Optional, List
 from pathlib import Path
+import re
+import numpy as np
 
 from app.config import settings
 from app.core.video_processor import VideoProcessor
@@ -147,16 +149,18 @@ class SubtitleService:
                         frame, region, ocr_lang
                     )
 
-                    # Collect detection results
-                    for det in detections:
-                        detected_text = DetectedText(
-                            text=det['text'],
-                            confidence=det['confidence'],
-                            box=det['box'],
-                            timestamp=timestamp,
-                            frame_index=frame_idx
-                        )
-                        all_detections.append(detected_text)
+                    merged_detection = self._merge_detections_in_frame(detections)
+                    if not merged_detection:
+                        continue
+
+                    detected_text = DetectedText(
+                        text=merged_detection['text'],
+                        confidence=merged_detection['confidence'],
+                        box=merged_detection['box'],
+                        timestamp=timestamp,
+                        frame_index=frame_idx
+                    )
+                    all_detections.append(detected_text)
 
         # Phase 4: Merge and generate subtitles
         logger.info(f"Merging {len(all_detections)} text detections...")
@@ -227,3 +231,78 @@ class SubtitleService:
         result = self.extract_subtitles(video_path, **kwargs)
         self.save_srt(result, output_path)
         return result
+
+    def _merge_detections_in_frame(self, detections: List[dict]) -> Optional[dict]:
+        cleaned = []
+        for det in detections:
+            text = det.get('text', '').strip()
+            if not text:
+                continue
+            if det.get('confidence', 0.0) < settings.SUBTITLE_MIN_CONFIDENCE * 0.45:
+                continue
+            cleaned.append(det)
+
+        if not cleaned:
+            return None
+
+        cleaned = sorted(
+            cleaned,
+            key=lambda d: ((d['box'][1] + d['box'][3]) / 2, d['box'][0])
+        )
+
+        heights = [max(1, d['box'][3] - d['box'][1]) for d in cleaned]
+        line_gap = max(8, int(np.mean(heights) * 0.75))
+        lines = []
+        current = [cleaned[0]]
+
+        for det in cleaned[1:]:
+            prev_center_y = np.mean([(d['box'][1] + d['box'][3]) / 2 for d in current])
+            cur_center_y = (det['box'][1] + det['box'][3]) / 2
+            if abs(cur_center_y - prev_center_y) <= line_gap:
+                current.append(det)
+            else:
+                lines.append(current)
+                current = [det]
+        lines.append(current)
+
+        line_texts = []
+        all_boxes = []
+        all_scores = []
+        for line in lines:
+            line = sorted(line, key=lambda d: d['box'][0])
+            line_text = self._join_texts([d['text'] for d in line])
+            if line_text:
+                line_texts.append(line_text)
+                all_boxes.extend([d['box'] for d in line])
+                all_scores.extend([d['confidence'] for d in line])
+
+        if not line_texts:
+            return None
+
+        x1 = min(b[0] for b in all_boxes)
+        y1 = min(b[1] for b in all_boxes)
+        x2 = max(b[2] for b in all_boxes)
+        y2 = max(b[3] for b in all_boxes)
+        text = "\n".join(line_texts)
+        confidence = float(np.mean(all_scores))
+        return {"text": text, "confidence": confidence, "box": (x1, y1, x2, y2)}
+
+    def _join_texts(self, pieces: List[str]) -> str:
+        if not pieces:
+            return ""
+
+        merged = pieces[0].strip()
+        for piece in pieces[1:]:
+            right = piece.strip()
+            if not right:
+                continue
+            if self._needs_space(merged[-1], right[0]):
+                merged += " " + right
+            else:
+                merged += right
+
+        merged = re.sub(r'\s+', ' ', merged).strip()
+        return merged
+
+    def _needs_space(self, left_char: str, right_char: str) -> bool:
+        return left_char.isalnum() and right_char.isalnum()
