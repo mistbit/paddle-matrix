@@ -1,203 +1,187 @@
-# Video Subtitle OCR Service
+# Paddle Matrix - Video Subtitle OCR Service
 
-基于 PaddleOCR 的视频字幕 OCR 识别 HTTP 服务，自动从视频中提取硬字幕并生成 SRT 字幕文件。
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![License](https://img.shields.io/badge/License-Apache%202.0-green)
+![Docker](https://img.shields.io/badge/Docker-Supported-blue)
 
-## 功能特性
+[中文文档](README_CN.md)
 
-- 🔍 **自动字幕区域检测**：智能识别字幕出现的位置
-- 📝 **多语言支持**：支持中文、英文、日文、韩文等
-- 🎬 **视频格式支持**：MP4、AVI、MOV、MKV、WebM 等主流格式
-- 📄 **SRT 字幕生成**：自动生成标准 SRT 格式字幕文件
-- 🚀 **同步/异步处理**：支持小文件同步处理和大文件异步处理
-- 🐳 **Docker 支持**：一键容器化部署
+**Paddle Matrix** is a high-performance HTTP service powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) designed to extract hardcoded subtitles from videos and generate standard SRT subtitle files. It provides a robust API for video subtitle extraction with support for multiple languages and video formats.
 
-## 系统要求
+## ✨ Features
 
-- Python 3.10+
-- FFmpeg (用于视频处理)
+- **🎯 Auto Subtitle Detection**: Intelligently identifies subtitle regions within video frames without manual specification.
+- **🌍 Multi-language Support**: robust support for Chinese, English, Japanese, Korean, and more.
+- **📹 Wide Format Support**: Compatible with MP4, AVI, MOV, MKV, WebM, FLV, WMV, and other mainstream video formats.
+- **📄 SRT Generation**: Automatically generates standard SubRip Subtitle (SRT) files with precise timestamps.
+- **⚡ Sync/Async Processing**:
+  - **Synchronous**: Real-time processing for short videos.
+  - **Asynchronous**: Background task processing for long videos with status polling.
+- **🐳 Docker Ready**: One-click deployment using Docker and Docker Compose.
+- **🖥️ Web UI**: Includes a simple built-in web interface for file uploads and testing.
 
-## 快速开始
+## 🧠 Algorithm & Technical Details
 
-### 安装依赖
+### 1. Intelligent Subtitle Region Detection
+
+Paddle Matrix uses a proprietary **"Anchor Discovery Mechanism"** to automatically locate subtitle regions without manual ROI (Region of Interest) specification.
+
+-   **Multi-Strategy Detection Pipeline**:
+    1.  **Bottom ROI Priority**: Scans the bottom 35% of the video first, covering 90% of subtitle scenarios.
+    2.  **Global Scan**: Falls back to full-frame scanning if no text is found in the bottom region.
+    3.  **Temporal Subtitle Bands**: Utilizes morphological operations (Top-hat/Black-hat transforms) and vertical projection analysis to identify spatiotemporal bands with "subtitle characteristics."
+-   **Stability Clustering**:
+    -   Performs **Y-axis coordinate clustering** on detection results from sampled frames.
+    -   Analyzes text box frequency and positional stability to lock onto the most probable "Subtitle Anchor."
+    -   Automatically filters out transient text (e.g., bullet comments, signs), preserving only stable subtitle streams.
+
+### 2. OCR Engine Integration
+
+Powered by Baidu's open-source **PaddleOCR** deep learning framework, delivering industrial-grade text recognition capabilities.
+
+-   **Models & Architecture**: Uses PP-OCRv3/v4 ultra-lightweight models to optimize inference speed while maintaining high accuracy.
+-   **Dynamic Multi-Language Loading**: Supports on-demand loading of language models (`ch`, `en`, `japan`, `korean`, etc.) based on request parameters, saving GPU/CPU memory.
+-   **Preprocessing Optimization**: Built-in OpenCV image preprocessing pipeline handles color space conversion (BGR -> RGB) and image enhancement to boost OCR recognition rates.
+
+### 3. Subtitle Sequence Merger Algorithm
+
+Raw frame-by-frame OCR results are fragmented and contain redundancy. We designed the **SubtitleMerger** algorithm to transform them into smooth SRT subtitles.
+
+-   **Similarity-Based Deduplication**:
+    -   Uses `SequenceMatcher` to calculate text similarity between adjacent frames.
+    -   Merges text when similarity > `SUBTITLE_MERGE_THRESHOLD` (default 0.8) and the time gap is within tolerance.
+-   **Voting Mechanism**: For multiple detections of the same subtitle line, a **"Confidence + Frequency"** weighted voting system selects the best text content, effectively removing random OCR noise characters.
+-   **Timeline Smoothing**: Automatically merges micro-gaps in time and estimates reasonable end times based on text length, generating a seamless timeline.
+
+## 🛠️ System Requirements
+
+- **Python**: 3.10 or higher
+- **FFmpeg**: Required for video frame extraction and processing.
+- **OS**: Linux, macOS, or Windows
+
+## 🚀 Quick Start
+
+### 1. Installation
+
+#### Install FFmpeg
+
+- **Ubuntu/Debian**:
+  ```bash
+  sudo apt update && sudo apt install ffmpeg
+  ```
+- **macOS**:
+  ```bash
+  brew install ffmpeg
+  ```
+- **Windows**: Download from [FFmpeg website](https://ffmpeg.org/download.html) and add to PATH.
+
+#### Install Python Dependencies
 
 ```bash
+git clone https://github.com/yourusername/paddle-matrix.git
+cd paddle-matrix
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 启动服务
+### 2. Running the Service
+
+#### Using Uvicorn (Development)
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Docker 部署
+#### Using Helper Script
+
+```bash
+chmod +x manage.sh
+./manage.sh start
+```
+
+#### Using Docker (Recommended for Production)
 
 ```bash
 docker-compose up -d
 ```
 
-## API 文档
+The service will be available at `http://localhost:8000`.
 
-启动服务后访问：http://localhost:8000/docs
+## 📖 Usage
 
-### 主要接口
+### Web Interface
 
-#### 1. 同步提取字幕
+Access the built-in web UI at `http://localhost:8000/` to upload videos and test the extraction directly from your browser.
 
-```
-POST /api/v1/subtitle/extract
-Content-Type: multipart/form-data
+### API Documentation
 
-参数：
-- video: 视频文件
-- language: 语言 (auto/ch/en/korean/japan)
-- sample_interval: 采样间隔(秒)，默认 1.0
-- merge_threshold: 合并阈值，默认 0.8
-- detect_region: 是否自动检测字幕区域，默认 true
-```
+Interactive API documentation (Swagger UI) is available at `http://localhost:8000/docs`.
 
-#### 2. 异步提取字幕
+#### Key Endpoints
 
-```
-POST /api/v1/subtitle/extract/async
-Content-Type: multipart/form-data
+1.  **Synchronous Extraction**
+    -   **Endpoint**: `POST /api/v1/subtitle/extract`
+    -   **Description**: Upload a video and wait for the SRT content in response. Best for short clips.
+    -   **Parameters**:
+        -   `video`: Video file (multipart/form-data)
+        -   `language`: `ch` (Chinese), `en` (English), `japan` (Japanese), `korean` (Korean), `auto`.
+        -   `sample_interval`: Frame sampling interval in seconds (default: 1.0).
 
-返回 task_id 用于查询进度
-```
+2.  **Asynchronous Extraction**
+    -   **Endpoint**: `POST /api/v1/subtitle/extract/async`
+    -   **Description**: Upload a video and get a `task_id`. Suitable for long videos.
+    -   **Response**: `{"task_id": "uuid..."}`
 
-#### 3. 查询任务状态
+3.  **Check Task Status**
+    -   **Endpoint**: `GET /api/v1/subtitle/status/{task_id}`
+    -   **Response**: Status (`pending`, `processing`, `completed`, `failed`) and progress.
 
-```
-GET /api/v1/subtitle/status/{task_id}
-```
+4.  **Download Subtitles**
+    -   **Endpoint**: `GET /api/v1/subtitle/download/{task_id}`
+    -   **Description**: Download the generated SRT file for a completed task.
 
-#### 4. 下载 SRT 文件
-
-```
-GET /api/v1/subtitle/download/{task_id}
-```
-
-## 使用示例
-
-### cURL
+### Example: Extract Subtitles with cURL
 
 ```bash
-# 同步提取
+# Synchronous extraction (Chinese)
 curl -X POST "http://localhost:8000/api/v1/subtitle/extract" \
   -H "Content-Type: multipart/form-data" \
-  -F "video=@test.mp4" \
-  -F "language=ch"
+  -F "video=@my_video.mp4" \
+  -F "language=ch" > output.srt
 
-# 异步提取
+# Asynchronous extraction
 curl -X POST "http://localhost:8000/api/v1/subtitle/extract/async" \
   -H "Content-Type: multipart/form-data" \
-  -F "video=@large_video.mp4"
-
-# 查询状态
-curl "http://localhost:8000/api/v1/subtitle/status/{task_id}"
-
-# 下载 SRT
-curl "http://localhost:8000/api/v1/subtitle/download/{task_id}" -o output.srt
+  -F "video=@movie.mkv"
 ```
 
-### Python
+## ⚙️ Configuration
 
-```python
-import requests
+You can configure the application using environment variables or a `.env` file. Copy `.env.example` to `.env` to get started.
 
-# 上传视频并提取字幕
-with open('video.mp4', 'rb') as f:
-    response = requests.post(
-        'http://localhost:8000/api/v1/subtitle/extract',
-        files={'video': f},
-        data={'language': 'ch', 'sample_interval': 1.0}
-    )
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `APP_NAME` | Application Name | Video Subtitle OCR Service |
+| `DEBUG` | Enable debug mode | `False` |
+| `PADDLEOCR_LANG` | Default OCR Language | `ch` |
+| `VIDEO_SAMPLE_INTERVAL` | Frame sampling interval (sec) | `1.0` |
+| `SUBTITLE_MERGE_THRESHOLD` | Text similarity threshold for merging | `0.8` |
+| `UPLOAD_DIR` | Directory for temp uploads | `/tmp/uploads` |
+| `OUTPUT_DIR` | Directory for generated SRTs | `/tmp/outputs` |
 
-result = response.json()
-print(result['srt_content'])
+## 🤝 Contributing
 
-# 保存 SRT 文件
-with open('output.srt', 'w', encoding='utf-8') as f:
-    f.write(result['srt_content'])
-```
+Contributions are welcome! Please follow these steps:
 
-## 配置说明
+1.  Fork the repository.
+2.  Create a new branch (`git checkout -b feature/amazing-feature`).
+3.  Commit your changes (`git commit -m 'feat(core): add amazing feature'`).
+4.  Push to the branch (`git push origin feature/amazing-feature`).
+5.  Open a Pull Request.
 
-环境变量配置（参考 `.env.example`）：
+Please adhere to the [Conventional Commits](https://www.conventionalcommits.org/) specification for commit messages.
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| PADDLEOCR_USE_GPU | 是否使用 GPU | false |
-| PADDLEOCR_LANG | 默认语言 | ch |
-| VIDEO_SAMPLE_INTERVAL | 默认采样间隔(秒) | 1.0 |
-| VIDEO_MAX_DURATION | 最大视频时长(秒) | 3600 |
-| SUBTITLE_MIN_CONFIDENCE | 最小置信度阈值 | 0.7 |
-| MAX_UPLOAD_SIZE | 最大上传文件大小 | 500MB |
+## 📄 License
 
-## 处理流程
-
-```
-视频输入
-    ↓
-视频解码 (OpenCV/FFmpeg)
-    ↓
-预检测 (锚点发现)
-    ├── 均匀采样 N 帧
-    ├── OCR 检测文本区域
-    └── 聚类确定字幕位置
-    ↓
-主检测 (采样 + OCR)
-    ├── 按时间间隔采样
-    ├── 在字幕区域进行 OCR
-    └── 收集识别结果
-    ↓
-字幕合并
-    ├── 文本相似度合并
-    ├── 时间边界调整
-    └── 置信度过滤
-    ↓
-SRT 生成
-```
-
-## 项目结构
-
-```
-paddle-matrix/
-├── app/
-│   ├── main.py              # FastAPI 入口
-│   ├── config.py            # 配置管理
-│   ├── api/v1/subtitle.py   # API 端点
-│   ├── core/
-│   │   ├── video_processor.py   # 视频处理
-│   │   ├── subtitle_detector.py # 字幕区域检测
-│   │   ├── ocr_engine.py        # OCR 引擎
-│   │   ├── subtitle_merger.py   # 字幕合并
-│   │   └── srt_generator.py     # SRT 生成
-│   ├── models/
-│   │   ├── domain.py        # 领域模型
-│   │   └── schemas.py       # API 模型
-│   └── services/
-│       └── subtitle_service.py  # 业务逻辑
-├── tests/
-├── requirements.txt
-├── Dockerfile
-└── docker-compose.yml
-```
-
-## 开发
-
-### 运行测试
-
-```bash
-pytest tests/
-```
-
-### 本地开发模式
-
-```bash
-uvicorn app.main:app --reload --debug
-```
-
-## License
-
-Apache License 2.0
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
