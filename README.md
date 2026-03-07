@@ -17,8 +17,9 @@
 - **⚡ Sync/Async Processing**:
   - **Synchronous**: Real-time processing for short videos.
   - **Asynchronous**: Background task processing for long videos with status polling.
+- **🔍 Detailed Debug Info**: Integrated debug info (raw OCR data, padding, original boxes) displayed in the Web UI for troubleshooting.
 - **🐳 Docker Ready**: One-click deployment using Docker and Docker Compose.
-- **🖥️ Web UI**: Includes a simple built-in web interface for file uploads and testing.
+- **🖥️ Web UI**: Includes a simple built-in web interface for file uploads and testing with interactive debug panel.
 
 ## 🧠 Algorithm & Technical Details
 
@@ -30,9 +31,10 @@ Paddle Matrix uses a proprietary **"Anchor Discovery Mechanism"** to automatical
     1.  **Bottom ROI Priority**: Scans the bottom 35% of the video first, covering 90% of subtitle scenarios.
     2.  **Global Scan**: Falls back to full-frame scanning if no text is found in the bottom region.
     3.  **Temporal Subtitle Bands**: Utilizes morphological operations (Top-hat/Black-hat transforms) and vertical projection analysis to identify spatiotemporal bands with "subtitle characteristics."
--   **Stability Clustering**:
+-   **Stability Clustering & Optimized Padding**:
     -   Performs **Y-axis coordinate clustering** on detection results from sampled frames.
     -   Analyzes text box frequency and positional stability to lock onto the most probable "Subtitle Anchor."
+    -   **Enhanced Dynamic Padding**: Automatically calculates optimized padding (`x_pad: 8%`, `y_pad: 30%` of width/height) around the median box to ensure all text characters are fully captured without being clipped.
     -   Automatically filters out transient text (e.g., bullet comments, signs), preserving only stable subtitle streams.
 
 ### 2. OCR Engine Integration
@@ -51,7 +53,9 @@ Raw frame-by-frame OCR results are fragmented and contain redundancy. We designe
     -   Uses `SequenceMatcher` to calculate text similarity between adjacent frames.
     -   Merges text when similarity > `SUBTITLE_MERGE_THRESHOLD` (default 0.8) and the time gap is within tolerance.
 -   **Voting Mechanism**: For multiple detections of the same subtitle line, a **"Confidence + Frequency"** weighted voting system selects the best text content, effectively removing random OCR noise characters.
--   **Timeline Smoothing**: Automatically merges micro-gaps in time and estimates reasonable end times based on text length, generating a seamless timeline.
+-   **Timeline Smoothing & Debug Data Aggregation**:
+    -   Automatically merges micro-gaps in time and estimates reasonable end times based on text length, generating a seamless timeline.
+    -   **Full Traceability**: Aggregates raw detection coordinates, confidence scores, and selection counts into a `debug_info` object for each merged subtitle, providing transparent insights into the merging process.
 
 ## 🛠️ System Requirements
 

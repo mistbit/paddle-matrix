@@ -150,7 +150,7 @@ class SubtitleMerger:
         best_text = max(text_counts.items(), key=lambda x: x[1])[0]
         best_text_detections = [det for det in group if det.text == best_text]
         box_source_detections = best_text_detections if best_text_detections else group
-        stable_box = self._compute_stable_box(box_source_detections)
+        stable_box, debug_info = self._compute_stable_box(box_source_detections)
 
         # Calculate average confidence
         avg_confidence = np.mean([d.confidence for d in group])
@@ -166,12 +166,42 @@ class SubtitleMerger:
             end_time=end_time,
             text=best_text,
             confidence=avg_confidence,
-            box=stable_box
+            box=stable_box,
+            debug_info=debug_info
         )
 
-    def _compute_stable_box(self, detections: List[DetectedText]) -> Tuple[int, int, int, int]:
+    def _compute_stable_box(self, detections: List[DetectedText]) -> Tuple[Tuple[int, int, int, int], dict]:
+        # Collect raw data for debugging
+        raw_data = []
+        for det in detections:
+            raw_data.append({
+                "box": det.box,
+                "confidence": det.confidence,
+                "timestamp": det.timestamp,
+                "text": det.text
+            })
+
         if len(detections) == 1:
-            return detections[0].box
+            box = detections[0].box
+            # Apply padding even for single detection
+            width = max(1.0, box[2] - box[0])
+            height = max(1.0, box[3] - box[1])
+            pad_x = max(5.0, width * 0.08)
+            pad_y = max(4.0, height * 0.3)
+            
+            x1 = int(round(box[0] - pad_x))
+            y1 = int(round(box[1] - pad_y))
+            x2 = int(round(box[2] + pad_x))
+            y2 = int(round(box[3] + pad_y))
+            
+            if x2 <= x1: x2 = x1 + 1
+            if y2 <= y1: y2 = y1 + 1
+            
+            return (x1, y1, x2, y2), {
+                "raw_detections": raw_data,
+                "method": "single",
+                "padding": {"x": pad_x, "y": pad_y}
+            }
 
         boxes = np.array([det.box for det in detections], dtype=np.float64)
         confidence = np.array([max(0.01, det.confidence) for det in detections], dtype=np.float64)
@@ -184,8 +214,10 @@ class SubtitleMerger:
         med = np.median(selected, axis=0)
         width = max(1.0, med[2] - med[0])
         height = max(1.0, med[3] - med[1])
-        pad_x = max(2.0, width * 0.02)
-        pad_y = max(2.0, height * 0.2)
+        
+        # Increased padding
+        pad_x = max(5.0, width * 0.08)
+        pad_y = max(4.0, height * 0.3)
 
         x1 = int(round(med[0] - pad_x))
         y1 = int(round(med[1] - pad_y))
@@ -195,7 +227,14 @@ class SubtitleMerger:
             x2 = x1 + 1
         if y2 <= y1:
             y2 = y1 + 1
-        return (x1, y1, x2, y2)
+            
+        return (x1, y1, x2, y2), {
+            "raw_detections": raw_data,
+            "method": "median_stable",
+            "median_box": med.tolist(),
+            "padding": {"x": pad_x, "y": pad_y},
+            "selected_count": len(selected)
+        }
 
     def _adjust_time_boundaries(self, subtitles: List[Subtitle]) -> List[Subtitle]:
         """

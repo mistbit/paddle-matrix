@@ -55,6 +55,10 @@ class SubtitleItem(BaseModel):
         default=None,
         description="Subtitle bounding box (x1, y1, x2, y2) in video pixels"
     )
+    debug_info: Optional[dict] = Field(
+        default=None,
+        description="Debug information for bounding box calculation"
+    )
 
 
 class SubtitleAnchorItem(BaseModel):

@@ -162,7 +162,7 @@
                         </span>
                     </div>
                 </div>
-                <div class="video-stage">
+                <div class="video-stage" ref="videoStage">
                     <video ref="videoPlayer"
                            class="w-full h-auto max-h-[520px]"
                            :src="videoPreviewUrl"
@@ -178,6 +178,10 @@
                 <p class="text-xs mt-1" :class="overlayDebugInfo.usingDynamic ? 'text-green-600' : 'text-amber-600'">
                     调试：{{ overlayDebugInfo.message }}
                 </p>
+                <div v-if="activeSubtitle && activeSubtitle.debug_info" class="mt-4 p-4 bg-gray-50 rounded-lg text-xs font-mono overflow-auto max-h-48 border border-gray-200">
+                    <h3 class="font-semibold text-gray-700 mb-2">详细调试信息 (Debug Info)</h3>
+                    <pre>{{ JSON.stringify(activeSubtitle.debug_info, null, 2) }}</pre>
+                </div>
             </div>
 
             <!-- Processing Status -->
@@ -354,6 +358,9 @@
                 const pollingInterval = ref(null);
                 const videoPreviewUrl = ref('');
                 const videoPlayer = ref(null);
+                const videoStage = ref(null);
+                const overlayLayoutVersion = ref(0);
+                const overlayResizeObserver = ref(null);
                 const videoState = reactive({
                     duration: 0,
                     currentTime: 0
@@ -378,6 +385,21 @@
                 const API_BASE = window.location.origin;
 
                 // Methods
+                const refreshOverlayLayout = () => {
+                    overlayLayoutVersion.value += 1;
+                };
+
+                const ensureOverlayObserver = () => {
+                    if (typeof ResizeObserver === 'undefined' || !videoPlayer.value) return;
+                    if (overlayResizeObserver.value) {
+                        overlayResizeObserver.value.disconnect();
+                    }
+                    overlayResizeObserver.value = new ResizeObserver(() => {
+                        refreshOverlayLayout();
+                    });
+                    overlayResizeObserver.value.observe(videoPlayer.value);
+                };
+
                 const showToast = (message, type = 'info') => {
                     toast.message = message;
                     toast.type = type;
@@ -573,6 +595,8 @@
 
                 const onVideoMetadata = (event) => {
                     videoState.duration = event.target.duration || 0;
+                    ensureOverlayObserver();
+                    refreshOverlayLayout();
                 };
 
                 const onVideoTimeUpdate = (event) => {
@@ -585,28 +609,43 @@
                     return subtitles.find(sub => t >= sub.start_time && t <= sub.end_time) || null;
                 });
 
-                const toPercentBox = (box, videoEl) => {
+                const toOverlayBox = (box, videoEl, stageEl) => {
                     if (!Array.isArray(box) || box.length !== 4) return null;
                     const [x1, y1, x2, y2] = box;
                     const vw = videoEl?.videoWidth || 0;
                     const vh = videoEl?.videoHeight || 0;
-                    if (!vw || !vh) return null;
+                    const renderWidth = videoEl?.clientWidth || 0;
+                    const renderHeight = videoEl?.clientHeight || 0;
+                    if (!vw || !vh || !renderWidth || !renderHeight) return null;
 
-                    const left = Math.max(0, Math.min(100, (x1 / vw) * 100));
-                    const top = Math.max(0, Math.min(100, (y1 / vh) * 100));
-                    const width = Math.max(0, Math.min(100 - left, ((x2 - x1) / vw) * 100));
-                    const height = Math.max(0, Math.min(100 - top, ((y2 - y1) / vh) * 100));
+                    const stageWidth = stageEl?.clientWidth || renderWidth;
+                    const stageHeight = stageEl?.clientHeight || renderHeight;
+                    const offsetLeft = videoEl?.offsetLeft || 0;
+                    const offsetTop = videoEl?.offsetTop || 0;
+
+                    const rawLeft = offsetLeft + (x1 / vw) * renderWidth;
+                    const rawTop = offsetTop + (y1 / vh) * renderHeight;
+                    const rawRight = offsetLeft + (x2 / vw) * renderWidth;
+                    const rawBottom = offsetTop + (y2 / vh) * renderHeight;
+
+                    const left = Math.max(0, Math.min(stageWidth, rawLeft));
+                    const top = Math.max(0, Math.min(stageHeight, rawTop));
+                    const right = Math.max(left, Math.min(stageWidth, rawRight));
+                    const bottom = Math.max(top, Math.min(stageHeight, rawBottom));
+                    const width = Math.max(0, right - left);
+                    const height = Math.max(0, bottom - top);
 
                     return {
-                        left: `${left.toFixed(2)}%`,
-                        top: `${top.toFixed(2)}%`,
-                        width: `${width.toFixed(2)}%`,
-                        height: `${height.toFixed(2)}%`
+                        left: `${left.toFixed(2)}px`,
+                        top: `${top.toFixed(2)}px`,
+                        width: `${width.toFixed(2)}px`,
+                        height: `${height.toFixed(2)}px`
                     };
                 };
 
                 const overlayBoxes = computed(() => {
-                    const dynamicBox = toPercentBox(activeSubtitle.value?.box, videoPlayer.value);
+                    overlayLayoutVersion.value;
+                    const dynamicBox = toOverlayBox(activeSubtitle.value?.box, videoPlayer.value, videoStage.value);
                     if (dynamicBox) {
                         return [dynamicBox];
                     }
@@ -741,6 +780,7 @@
                 onMounted(() => {
                     checkServerStatus();
                     setInterval(checkServerStatus, 30000);
+                    window.addEventListener('resize', refreshOverlayLayout);
 
                     // Load history from localStorage
                     const savedHistory = localStorage.getItem('taskHistory');
@@ -754,6 +794,10 @@
                     if (videoPreviewUrl.value) {
                         URL.revokeObjectURL(videoPreviewUrl.value);
                     }
+                    window.removeEventListener('resize', refreshOverlayLayout);
+                    if (overlayResizeObserver.value) {
+                        overlayResizeObserver.value.disconnect();
+                    }
                 });
 
                 return {
@@ -765,10 +809,12 @@
                     taskHistory,
                     videoPreviewUrl,
                     videoPlayer,
+                    videoStage,
                     videoState,
                     showSubtitle,
                     overlayBoxes,
                     overlayDebugInfo,
+                    activeSubtitle,
                     activeSubtitleText,
                     options,
                     toast,
