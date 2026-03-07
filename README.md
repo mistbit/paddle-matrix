@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" width="200" alt="Paddle Matrix Logo">
+  <img src="docs/images/logo.png" width="200" alt="Paddle Matrix Logo">
 </p>
 
 # Paddle Matrix - Video Subtitle OCR Service
@@ -13,8 +13,6 @@
 [中文文档](README_CN.md)
 
 > **Paddle Matrix** is a high-performance HTTP service powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) designed to extract hardcoded subtitles from videos and generate standard SRT subtitle files. It provides a robust API for video subtitle extraction with support for multiple languages and video formats.
-
-![Web UI Interface](ui.png)
 
 ## 📚 Table of Contents
 
@@ -88,6 +86,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ## 🖥️ Web Interface
+
+![Web UI Interface](docs/images/web-ui-preview.png)
 
 Access the built-in web UI at `http://localhost:8000/` to upload videos and test the extraction directly from your browser.
 

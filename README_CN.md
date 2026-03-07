@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" width="200" alt="Paddle Matrix Logo">
+  <img src="docs/images/logo.png" width="200" alt="Paddle Matrix Logo">
 </p>
 
 # Paddle Matrix - 视频字幕 OCR 服务
@@ -13,8 +13,6 @@
 [English](README.md)
 
 > **Paddle Matrix** 是一个基于 [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) 的高性能 HTTP 服务，专为从视频中提取硬字幕并生成标准的 SRT 字幕文件而设计。它提供了强大的视频字幕提取 API，支持多种语言和主流视频格式。
-
-![Web UI 界面](ui.png)
 
 ## 📚 目录
 
@@ -88,6 +86,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ## 🖥️ Web 界面
+
+![Web UI 界面](docs/images/web-ui-preview.png)
 
 访问内置的 Web 界面 `http://localhost:8000/`，您可以直接在浏览器中进行操作：
 
