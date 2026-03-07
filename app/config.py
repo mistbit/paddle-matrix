@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     # OCR配置
     PADDLEOCR_USE_ANGLE_CLS: bool = True
     PADDLEOCR_LANG: str = "ch"  # 支持多语言: ch, en, korean, japan等
+    PADDLEOCR_USE_GPU: bool = False
     # Note: GPU usage is determined by the installed PaddlePaddle version:
     # - paddlepaddle: CPU only
     # - paddlepaddle-gpu: GPU acceleration
@@ -47,6 +48,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

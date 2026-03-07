@@ -3,6 +3,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load .env file if it exists
+if [[ -f "${ROOT_DIR}/.env" ]]; then
+  set -a
+  source "${ROOT_DIR}/.env"
+  set +a
+fi
+
 PID_FILE="${ROOT_DIR}/.paddle-matrix.pid"
 LOG_FILE="${ROOT_DIR}/.paddle-matrix.log"
 APP_MODULE="app.main:app"
@@ -107,6 +115,18 @@ run_compose() {
   fi
 }
 
+run_compose_dev() {
+  if ! docker_available; then
+    return 1
+  fi
+
+  if [[ "${DOCKER_USE_PLUGIN}" == "1" ]]; then
+    "${DOCKER_BIN}" compose -f "${ROOT_DIR}/docker-compose.yml" -f "${ROOT_DIR}/docker-compose.dev.yml" "$@"
+  else
+    "${DOCKER_BIN}" -f "${ROOT_DIR}/docker-compose.yml" -f "${ROOT_DIR}/docker-compose.dev.yml" "$@"
+  fi
+}
+
 is_docker_running() {
   if ! docker_available; then
     return 1
@@ -130,6 +150,16 @@ start_docker() {
 
   echo "Docker 服务启动失败"
   return 1
+}
+
+start_docker_dev() {
+  if ! docker_available; then
+    echo "未检测到 Docker，无法使用工程内运行环境"
+    return 1
+  fi
+
+  echo "Docker 开发模式启动中 (按 Ctrl+C 停止)..."
+  run_compose_dev up
 }
 
 stop_python_service() {
@@ -300,6 +330,38 @@ start() {
   return 1
 }
 
+dev() {
+  if is_running; then
+    echo "服务已在后台运行，请先停止: $0 stop"
+    return 1
+  fi
+
+  if is_docker_running; then
+    echo "Docker 服务已在后台运行，请先停止: $0 stop"
+    return 1
+  fi
+
+  cd "${ROOT_DIR}"
+
+  if [[ "${DOCKER_MODE}" == "docker" ]]; then
+    start_docker_dev
+    return $?
+  fi
+
+  if ! preflight; then
+    if [[ "${DOCKER_MODE}" == "python" ]]; then
+      return 1
+    fi
+    echo "本地依赖不可用，尝试使用 Docker 开发环境..."
+    start_docker_dev
+    return $?
+  fi
+
+  echo "启动本地开发模式 (热重载)..."
+  echo "按 Ctrl+C 停止"
+  exec "${PYTHON_BIN}" -m uvicorn "${APP_MODULE}" --host "${HOST}" --port "${PORT}" --reload
+}
+
 stop() {
   local stopped="0"
 
@@ -348,13 +410,16 @@ logs() {
 }
 
 usage() {
-  echo "用法: $0 {start|stop|restart|status|logs}"
+  echo "用法: $0 {start|stop|restart|status|logs|dev}"
   echo "可选环境变量: DOCKER_MODE=auto|python|docker"
 }
 
 case "${1:-}" in
   start)
     start
+    ;;
+  dev)
+    dev
     ;;
   stop)
     stop
