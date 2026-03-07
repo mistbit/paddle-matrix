@@ -51,6 +51,7 @@ class Subtitle:
     text: str
     confidence: float = 1.0
     box: Optional[Tuple[int, int, int, int]] = None
+    debug_info: Optional[dict] = None
 
     def to_srt_format(self) -> str:
         """Convert to SRT format"""

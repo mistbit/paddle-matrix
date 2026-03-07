@@ -38,8 +38,21 @@ def test_merge_detected_texts_keeps_subtitle_box():
     ])
     assert len(subtitles) == 2
     x1, y1, x2, y2 = subtitles[0].box
-    assert 95 <= x1 <= 115
-    assert 585 <= y1 <= 605
-    assert 620 <= x2 <= 640
-    assert 662 <= y2 <= 680
-    assert subtitles[1].box == (130, 590, 520, 650)
+    # With 8% width padding and 30% height padding
+    # Median box approx (110, 601, 620, 663), W=510, H=62
+    # pad_x ~= 41, pad_y ~= 19
+    # Expected: (69, 582, 661, 682)
+    assert 60 <= x1 <= 80
+    assert 570 <= y1 <= 590
+    assert 650 <= x2 <= 670
+    assert 670 <= y2 <= 690
+    
+    # Second subtitle (single detection)
+    # Original: (130, 590, 520, 650), W=390, H=60
+    # pad_x ~= 31, pad_y ~= 18
+    # Expected: (99, 572, 551, 668)
+    sx1, sy1, sx2, sy2 = subtitles[1].box
+    assert 90 <= sx1 <= 110
+    assert 560 <= sy1 <= 580
+    assert 540 <= sx2 <= 560
+    assert 660 <= sy2 <= 680

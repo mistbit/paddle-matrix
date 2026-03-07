@@ -89,7 +89,8 @@ async def extract_subtitles(
                 end_time=sub.end_time,
                 text=sub.text,
                 confidence=sub.confidence,
-                box=sub.box
+                box=sub.box,
+                debug_info=sub.debug_info
             )
             for sub in result.subtitles
         ]
@@ -191,16 +192,17 @@ async def extract_subtitles_async(
             srt_content = service.generate_srt(result)
 
             subtitle_items = [
-                SubtitleItem(
-                    index=sub.index,
-                    start_time=sub.start_time,
-                    end_time=sub.end_time,
-                    text=sub.text,
-                    confidence=sub.confidence,
-                    box=sub.box
-                )
-                for sub in result.subtitles
-            ]
+            SubtitleItem(
+                index=sub.index,
+                start_time=sub.start_time,
+                end_time=sub.end_time,
+                text=sub.text,
+                confidence=sub.confidence,
+                box=sub.box,
+                debug_info=sub.debug_info
+            )
+            for sub in result.subtitles
+        ]
             anchor_items = [
                 SubtitleAnchorItem(
                     center_x=anchor.center_x,
