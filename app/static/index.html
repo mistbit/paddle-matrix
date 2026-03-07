@@ -38,16 +38,19 @@
                             </svg>
                         </div>
                         <div>
-                            <h1 class="text-xl font-bold text-gray-900">视频字幕OCR识别</h1>
-                            <p class="text-xs text-gray-500">基于PaddleOCR的智能字幕提取</p>
+                            <h1 class="text-xl font-bold text-gray-900">{{ t('title') }}</h1>
+                            <p class="text-xs text-gray-500">{{ t('subtitle') }}</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
+                        <button @click="toggleLang" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
+                            {{ currentLang === 'zh' ? 'English' : '中文' }}
+                        </button>
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
                               :class="serverStatus === 'online' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
                             <span class="w-2 h-2 rounded-full mr-2"
                                   :class="serverStatus === 'online' ? 'bg-green-500' : 'bg-red-500'"></span>
-                            {{ serverStatus === 'online' ? '服务正常' : '服务离线' }}
+                            {{ serverStatus === 'online' ? t('server_status') : t('server_offline') }}
                         </span>
                     </div>
                 </div>
@@ -58,7 +61,7 @@
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <!-- Upload Section -->
             <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">上传视频</h2>
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('upload_title') }}</h2>
 
                 <!-- Drop Zone -->
                 <div class="drop-zone relative border-2 border-dashed border-gray-300 rounded-xl p-8 text-center transition-all cursor-pointer hover:border-blue-400 hover:bg-blue-50/50"
@@ -76,8 +79,8 @@
                             </svg>
                         </div>
                         <div>
-                            <p class="text-gray-600">拖放视频文件到这里，或 <span class="text-blue-600 font-medium">点击选择</span></p>
-                            <p class="text-sm text-gray-400 mt-1">支持 MP4, AVI, MOV, MKV, WebM 格式，最大 500MB</p>
+                            <p class="text-gray-600">{{ t('drag_drop_1') }} <span class="text-blue-600 font-medium">{{ t('drag_drop_2') }}</span></p>
+                            <p class="text-sm text-gray-400 mt-1">{{ t('support_format') }}</p>
                         </div>
                     </div>
 
@@ -92,7 +95,7 @@
                             <p class="text-sm text-gray-500">{{ formatFileSize(selectedFile.size) }}</p>
                         </div>
                         <button @click.stop="clearFile" class="text-red-600 hover:text-red-700 text-sm font-medium">
-                            清除选择
+                            {{ t('clear_select') }}
                         </button>
                     </div>
                 </div>
@@ -100,22 +103,22 @@
                 <!-- Options -->
                 <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">语言</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('lang_label') }}</label>
                         <select v-model="options.language" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                            <option value="auto">自动检测</option>
-                            <option value="ch">中文</option>
-                            <option value="en">英文</option>
-                            <option value="korean">韩文</option>
-                            <option value="japan">日文</option>
+                            <option value="auto">{{ t('lang_auto') }}</option>
+                            <option value="ch">{{ t('lang_zh') }}</option>
+                            <option value="en">{{ t('lang_en') }}</option>
+                            <option value="korean">{{ t('lang_ko') }}</option>
+                            <option value="japan">{{ t('lang_jp') }}</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">采样间隔 (秒)</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('sample_interval') }}</label>
                         <input type="number" v-model.number="options.sampleInterval" min="0.5" max="10" step="0.5"
                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">合并阈值</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('merge_threshold') }}</label>
                         <input type="number" v-model.number="options.mergeThreshold" min="0" max="1" step="0.1"
                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
@@ -124,7 +127,7 @@
                 <div class="mt-6 flex items-center space-x-4">
                     <label class="flex items-center space-x-2 cursor-pointer">
                         <input type="checkbox" v-model="options.detectRegion" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                        <span class="text-sm text-gray-700">自动检测字幕区域</span>
+                        <span class="text-sm text-gray-700">{{ t('auto_detect_region') }}</span>
                     </label>
                 </div>
 
@@ -133,21 +136,21 @@
                     <button v-if="!isProcessing" @click="startExtraction"
                             :disabled="!selectedFile"
                             class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/25">
-                        开始提取
+                        {{ t('start_extract') }}
                     </button>
                     <button v-else @click="cancelExtraction"
                             class="px-6 py-3 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition-all">
-                        取消任务
+                        {{ t('cancel_task') }}
                     </button>
                 </div>
             </div>
 
             <div v-if="videoPreviewUrl" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold text-gray-900">视频预览与字幕框</h2>
+                    <h2 class="text-lg font-semibold text-gray-900">{{ t('preview_title') }}</h2>
                     <div class="flex items-center space-x-4">
                         <label class="flex items-center space-x-2 cursor-pointer">
-                            <span class="text-sm text-gray-600">显示字幕</span>
+                            <span class="text-sm text-gray-600">{{ t('show_subtitle') }}</span>
                             <button @click="showSubtitle = !showSubtitle"
                                     type="button"
                                     class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -174,12 +177,12 @@
                          :style="{ left: box.left, top: box.top, width: box.width, height: box.height }"></div>
                     <div v-if="activeSubtitleText && showSubtitle" class="subtitle-overlay-text">{{ activeSubtitleText }}</div>
                 </div>
-                <p class="text-xs text-gray-500 mt-3">绿色框仅在当前时间命中字幕且存在检测框时显示。</p>
+                <p class="text-xs text-gray-500 mt-3">{{ t('green_box_hint') }}</p>
                 <p class="text-xs mt-1" :class="overlayDebugInfo.usingDynamic ? 'text-green-600' : 'text-amber-600'">
-                    调试：{{ overlayDebugInfo.message }}
+                    {{ t('debug_prefix') }}{{ overlayDebugInfo.message }}
                 </p>
                 <div v-if="activeSubtitle && activeSubtitle.debug_info" class="mt-4 p-4 bg-gray-50 rounded-lg text-xs font-mono overflow-auto max-h-48 border border-gray-200">
-                    <h3 class="font-semibold text-gray-700 mb-2">详细调试信息 (Debug Info)</h3>
+                    <h3 class="font-semibold text-gray-700 mb-2">{{ t('debug_detail_title') }}</h3>
                     <pre>{{ JSON.stringify(activeSubtitle.debug_info, null, 2) }}</pre>
                 </div>
             </div>
@@ -188,7 +191,7 @@
             <transition name="slide">
                 <div v-if="currentTask" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
                     <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-semibold text-gray-900">处理状态</h2>
+                        <h2 class="text-lg font-semibold text-gray-900">{{ t('process_status') }}</h2>
                         <span class="px-3 py-1 rounded-full text-sm font-medium"
                               :class="{
                                   'bg-yellow-100 text-yellow-800': currentTask.status === 'pending',
@@ -203,7 +206,7 @@
                     <!-- Progress Bar -->
                     <div class="mb-4">
                         <div class="flex justify-between text-sm text-gray-600 mb-1">
-                            <span>处理进度</span>
+                            <span>{{ t('progress') }}</span>
                             <span>{{ currentTask.progress }}%</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
@@ -220,26 +223,26 @@
                     <!-- Task Info -->
                     <div v-if="currentTask.result" class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div class="bg-gray-50 rounded-lg p-3">
-                            <p class="text-gray-500">视频时长</p>
+                            <p class="text-gray-500">{{ t('duration') }}</p>
                             <p class="font-semibold text-gray-900">{{ formatDuration(currentTask.result.duration) }}</p>
                         </div>
                         <div class="bg-gray-50 rounded-lg p-3">
-                            <p class="text-gray-500">处理帧数</p>
+                            <p class="text-gray-500">{{ t('processed_frames') }}</p>
                             <p class="font-semibold text-gray-900">{{ currentTask.result.processed_frames }} / {{ currentTask.result.total_frames }}</p>
                         </div>
                         <div class="bg-gray-50 rounded-lg p-3">
-                            <p class="text-gray-500">字幕数量</p>
+                            <p class="text-gray-500">{{ t('subtitle_count') }}</p>
                             <p class="font-semibold text-gray-900">{{ currentTask.result.subtitles?.length || 0 }}</p>
                         </div>
                         <div class="bg-gray-50 rounded-lg p-3">
-                            <p class="text-gray-500">检测语言</p>
+                            <p class="text-gray-500">{{ t('detected_lang') }}</p>
                             <p class="font-semibold text-gray-900">{{ getLanguageText(currentTask.result.detected_language) }}</p>
                         </div>
                     </div>
 
                     <!-- Error Message -->
                     <div v-if="currentTask.error" class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                        <p class="text-red-800 font-medium">错误信息</p>
+                        <p class="text-red-800 font-medium">{{ t('error_info') }}</p>
                         <p class="text-red-600 text-sm mt-1">{{ currentTask.error }}</p>
                     </div>
                 </div>
@@ -251,14 +254,14 @@
                     <!-- Subtitle Preview -->
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                         <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-lg font-semibold text-gray-900">字幕预览</h2>
+                            <h2 class="text-lg font-semibold text-gray-900">{{ t('subtitle_preview') }}</h2>
                             <div class="flex space-x-2">
                                 <button @click="copySrt" class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
                                     <span class="flex items-center space-x-1">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                                         </svg>
-                                        <span>复制</span>
+                                        <span>{{ t('copy') }}</span>
                                     </span>
                                 </button>
                                 <button @click="downloadSrt" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
@@ -266,7 +269,7 @@
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                                         </svg>
-                                        <span>下载SRT</span>
+                                        <span>{{ t('download_srt') }}</span>
                                     </span>
                                 </button>
                             </div>
@@ -290,7 +293,7 @@
 
                     <!-- SRT Content -->
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-4">SRT内容</h2>
+                        <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('srt_content') }}</h2>
                         <pre class="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono max-h-64 overflow-y-auto">{{ currentTask.result.srt_content }}</pre>
                     </div>
                 </div>
@@ -298,7 +301,7 @@
 
             <!-- History Section -->
             <div v-if="taskHistory.length > 0" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                <h2 class="text-lg font-semibold text-gray-900 mb-4">历史记录</h2>
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">{{ t('history') }}</h2>
                 <div class="space-y-3">
                     <div v-for="task in taskHistory" :key="task.id"
                          class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
@@ -322,7 +325,7 @@
                                   }">
                                 {{ getStatusText(task.status) }}
                             </span>
-                            <span class="text-sm text-gray-500">{{ task.subtitleCount }} 条字幕</span>
+                            <span class="text-sm text-gray-500">{{ task.subtitleCount }} {{ t('subtitle_unit') }}</span>
                         </div>
                     </div>
                 </div>
@@ -344,11 +347,141 @@
     </div>
 
     <script>
-        const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue;
+        const { createApp, ref, reactive, computed, onMounted, onUnmounted, watch } = Vue;
+
+        const i18n = {
+            zh: {
+                title: '视频字幕OCR识别',
+                subtitle: '基于PaddleOCR的智能字幕提取',
+                server_status: '服务正常',
+                server_offline: '服务离线',
+                upload_title: '上传视频',
+                drag_drop_1: '拖放视频文件到这里，或',
+                drag_drop_2: '点击选择',
+                support_format: '支持 MP4, AVI, MOV, MKV, WebM 格式，最大 500MB',
+                clear_select: '清除选择',
+                lang_label: '语言',
+                lang_auto: '自动检测',
+                lang_zh: '中文',
+                lang_en: '英文',
+                lang_ko: '韩文',
+                lang_jp: '日文',
+                sample_interval: '采样间隔 (秒)',
+                merge_threshold: '合并阈值',
+                auto_detect_region: '自动检测字幕区域',
+                start_extract: '开始提取',
+                cancel_task: '取消任务',
+                preview_title: '视频预览与字幕框',
+                show_subtitle: '显示字幕',
+                green_box_hint: '绿色框仅在当前时间命中字幕且存在检测框时显示。',
+                debug_prefix: '调试：',
+                debug_dynamic: '动态框生效（字幕#{index}，box={box}）',
+                debug_no_box: '当前任务字幕无box（旧结果），请重新提取生成动态框',
+                debug_missing_box: '字幕#{index}缺少box，当前不显示绿色框',
+                debug_no_data: '暂无字幕与锚框数据',
+                debug_only_anchors: '仅有锚框数据（anchors={count}）',
+                debug_miss: '当前时间未命中字幕，不显示绿色框（box={count}/{total}）',
+                debug_detail_title: '详细调试信息 (Debug Info)',
+                process_status: '处理状态',
+                status_pending: '等待中',
+                status_processing: '处理中',
+                status_completed: '已完成',
+                status_failed: '失败',
+                progress: '处理进度',
+                duration: '视频时长',
+                processed_frames: '处理帧数',
+                subtitle_count: '字幕数量',
+                detected_lang: '检测语言',
+                error_info: '错误信息',
+                subtitle_preview: '字幕预览',
+                copy: '复制',
+                download_srt: '下载SRT',
+                srt_content: 'SRT内容',
+                history: '历史记录',
+                subtitle_unit: '条字幕',
+                toast_invalid_file: '请选择有效的视频文件',
+                toast_file_size: '文件大小不能超过500MB',
+                toast_file_selected: '文件已选择',
+                toast_select_first: '请先选择视频文件',
+                toast_submitted: '任务已提交，正在处理...',
+                toast_submit_fail: '提交失败: {msg}',
+                toast_complete: '字幕提取完成！',
+                toast_process_fail: '处理失败: {msg}',
+                toast_canceled: '任务已取消',
+                toast_copied: 'SRT内容已复制到剪贴板',
+                toast_copy_fail: '复制失败',
+                toast_downloaded: 'SRT文件已下载',
+                toast_download_fail: 'SRT下载失败'
+            },
+            en: {
+                title: 'Video Subtitle OCR',
+                subtitle: 'Smart Subtitle Extraction based on PaddleOCR',
+                server_status: 'Service Online',
+                server_offline: 'Service Offline',
+                upload_title: 'Upload Video',
+                drag_drop_1: 'Drag & Drop video here, or',
+                drag_drop_2: 'Click to Select',
+                support_format: 'Supports MP4, AVI, MOV, MKV, WebM, max 500MB',
+                clear_select: 'Clear Selection',
+                lang_label: 'Language',
+                lang_auto: 'Auto Detect',
+                lang_zh: 'Chinese',
+                lang_en: 'English',
+                lang_ko: 'Korean',
+                lang_jp: 'Japanese',
+                sample_interval: 'Sample Interval (s)',
+                merge_threshold: 'Merge Threshold',
+                auto_detect_region: 'Auto Detect Region',
+                start_extract: 'Start Extraction',
+                cancel_task: 'Cancel Task',
+                preview_title: 'Video Preview & Subtitle Box',
+                show_subtitle: 'Show Subtitle',
+                green_box_hint: 'Green box shows when subtitle is hit and box exists.',
+                debug_prefix: 'Debug: ',
+                debug_dynamic: 'Dynamic box active (Sub#{index}, box={box})',
+                debug_no_box: 'No box data in current task (old result), please re-extract',
+                debug_missing_box: 'Subtitle #{index} missing box, green box hidden',
+                debug_no_data: 'No subtitle or anchor data',
+                debug_only_anchors: 'Only anchor data (anchors={count})',
+                debug_miss: 'No subtitle hit at current time (box={count}/{total})',
+                debug_detail_title: 'Detailed Debug Info',
+                process_status: 'Processing Status',
+                status_pending: 'Pending',
+                status_processing: 'Processing',
+                status_completed: 'Completed',
+                status_failed: 'Failed',
+                progress: 'Progress',
+                duration: 'Duration',
+                processed_frames: 'Processed Frames',
+                subtitle_count: 'Subtitle Count',
+                detected_lang: 'Detected Language',
+                error_info: 'Error Message',
+                subtitle_preview: 'Subtitle Preview',
+                copy: 'Copy',
+                download_srt: 'Download SRT',
+                srt_content: 'SRT Content',
+                history: 'History',
+                subtitle_unit: 'subtitles',
+                toast_invalid_file: 'Please select a valid video file',
+                toast_file_size: 'File size cannot exceed 500MB',
+                toast_file_selected: 'File selected',
+                toast_select_first: 'Please select a video file first',
+                toast_submitted: 'Task submitted, processing...',
+                toast_submit_fail: 'Submission failed: {msg}',
+                toast_complete: 'Subtitle extraction completed!',
+                toast_process_fail: 'Processing failed: {msg}',
+                toast_canceled: 'Task canceled',
+                toast_copied: 'SRT content copied to clipboard',
+                toast_copy_fail: 'Copy failed',
+                toast_downloaded: 'SRT file downloaded',
+                toast_download_fail: 'SRT download failed'
+            }
+        };
 
         createApp({
             setup() {
                 // State
+                const currentLang = ref(localStorage.getItem('app_lang') || 'zh');
                 const serverStatus = ref('offline');
                 const selectedFile = ref(null);
                 const isDragging = ref(false);
@@ -385,6 +518,27 @@
                 const API_BASE = window.location.origin;
 
                 // Methods
+                const t = (key, params = {}) => {
+                    const dict = i18n[currentLang.value] || i18n.zh;
+                    let text = dict[key] || key;
+                    if (params) {
+                        Object.keys(params).forEach(k => {
+                            text = text.replace(`{${k}}`, params[k]);
+                        });
+                    }
+                    return text;
+                };
+
+                const toggleLang = () => {
+                    currentLang.value = currentLang.value === 'zh' ? 'en' : 'zh';
+                    localStorage.setItem('app_lang', currentLang.value);
+                };
+
+                // Watch title
+                watch(currentLang, () => {
+                    document.title = t('title');
+                }, { immediate: true });
+
                 const refreshOverlayLayout = () => {
                     overlayLayoutVersion.value += 1;
                 };
@@ -440,12 +594,12 @@
                     const maxSize = 500 * 1024 * 1024; // 500MB
 
                     if (!validTypes.includes(file.type) && !file.name.match(/\.(mp4|avi|mov|mkv|webm|flv|wmv)$/i)) {
-                        showToast('请选择有效的视频文件', 'error');
+                        showToast(t('toast_invalid_file'), 'error');
                         return;
                     }
 
                     if (file.size > maxSize) {
-                        showToast('文件大小不能超过500MB', 'error');
+                        showToast(t('toast_file_size'), 'error');
                         return;
                     }
 
@@ -456,7 +610,7 @@
                     videoPreviewUrl.value = URL.createObjectURL(file);
                     videoState.duration = 0;
                     videoState.currentTime = 0;
-                    showToast('文件已选择', 'success');
+                    showToast(t('toast_file_selected'), 'success');
                 };
 
                 const clearFile = () => {
@@ -471,7 +625,7 @@
 
                 const startExtraction = async () => {
                     if (!selectedFile.value) {
-                        showToast('请先选择视频文件', 'error');
+                        showToast(t('toast_select_first'), 'error');
                         return;
                     }
 
@@ -505,7 +659,7 @@
                         const data = await response.json();
                         currentTask.value.id = data.task_id;
                         currentTask.value.status = 'processing';
-                        showToast('任务已提交，正在处理...', 'info');
+                        showToast(t('toast_submitted'), 'info');
 
                         // Start polling for status
                         startPolling();
@@ -514,7 +668,7 @@
                         console.error('Extraction error:', error);
                         currentTask.value.status = 'failed';
                         currentTask.value.error = error.message;
-                        showToast('提交失败: ' + error.message, 'error');
+                        showToast(t('toast_submit_fail', {msg: error.message}), 'error');
                         isProcessing.value = false;
                     }
                 };
@@ -535,12 +689,12 @@
                             if (data.status === 'completed') {
                                 stopPolling();
                                 isProcessing.value = false;
-                                showToast('字幕提取完成！', 'success');
+                                showToast(t('toast_complete'), 'success');
                                 addToHistory();
                             } else if (data.status === 'failed') {
                                 stopPolling();
                                 isProcessing.value = false;
-                                showToast('处理失败: ' + data.error, 'error');
+                                showToast(t('toast_process_fail', {msg: data.error}), 'error');
                             }
                         } catch (error) {
                             console.error('Polling error:', error);
@@ -559,7 +713,7 @@
                     stopPolling();
                     currentTask.value = null;
                     isProcessing.value = false;
-                    showToast('任务已取消', 'info');
+                    showToast(t('toast_canceled'), 'info');
                 };
 
                 const addToHistory = () => {
@@ -666,44 +820,44 @@
                     if (hasActiveBox) {
                         return {
                             usingDynamic: true,
-                            message: `动态框生效（字幕#${active.index}，box=${active.box.join(',')}）`
+                            message: t('debug_dynamic', {index: active.index, box: active.box.join(',')})
                         };
                     }
                     if (subtitles.length > 0 && boxCount === 0) {
                         return {
                             usingDynamic: false,
-                            message: '当前任务字幕无box（旧结果），请重新提取生成动态框'
+                            message: t('debug_no_box')
                         };
                     }
                     if (active && !hasActiveBox) {
                         return {
                             usingDynamic: false,
-                            message: `字幕#${active.index}缺少box，当前不显示绿色框`
+                            message: t('debug_missing_box', {index: active.index})
                         };
                     }
                     if (!subtitles.length && !anchors.length) {
                         return {
                             usingDynamic: false,
-                            message: '暂无字幕与锚框数据'
+                            message: t('debug_no_data')
                         };
                     }
                     if (!subtitles.length && anchors.length) {
                         return {
                             usingDynamic: false,
-                            message: `仅有锚框数据（anchors=${anchors.length}）`
+                            message: t('debug_only_anchors', {count: anchors.length})
                         };
                     }
                     return {
                         usingDynamic: false,
-                        message: `当前时间未命中字幕，不显示绿色框（box=${boxCount}/${subtitles.length}）`
+                        message: t('debug_miss', {count: boxCount, total: subtitles.length})
                     };
                 });
 
                 const copySrt = () => {
                     if (currentTask.value?.result?.srt_content) {
                         navigator.clipboard.writeText(currentTask.value.result.srt_content)
-                            .then(() => showToast('SRT内容已复制到剪贴板', 'success'))
-                            .catch(() => showToast('复制失败', 'error'));
+                            .then(() => showToast(t('toast_copied'), 'success'))
+                            .catch(() => showToast(t('toast_copy_fail'), 'error'));
                     }
                 };
 
@@ -726,9 +880,9 @@
                             a.click();
                             document.body.removeChild(a);
                             URL.revokeObjectURL(url);
-                            showToast('SRT文件已下载', 'success');
+                            showToast(t('toast_downloaded'), 'success');
                         })
-                        .catch(() => showToast('SRT下载失败', 'error'));
+                        .catch(() => showToast(t('toast_download_fail'), 'error'));
                 };
 
                 // Utility functions
@@ -757,23 +911,23 @@
 
                 const getStatusText = (status) => {
                     const map = {
-                        'pending': '等待中',
-                        'processing': '处理中',
-                        'completed': '已完成',
-                        'failed': '失败'
+                        'pending': 'status_pending',
+                        'processing': 'status_processing',
+                        'completed': 'status_completed',
+                        'failed': 'status_failed'
                     };
-                    return map[status] || status;
+                    return t(map[status] || status);
                 };
 
                 const getLanguageText = (lang) => {
                     const map = {
-                        'auto': '自动检测',
-                        'ch': '中文',
-                        'en': '英文',
-                        'korean': '韩文',
-                        'japan': '日文'
+                        'auto': 'lang_auto',
+                        'ch': 'lang_zh',
+                        'en': 'lang_en',
+                        'korean': 'lang_ko',
+                        'japan': 'lang_jp'
                     };
-                    return map[lang] || lang;
+                    return t(map[lang] || lang);
                 };
 
                 // Lifecycle
@@ -801,6 +955,9 @@
                 });
 
                 return {
+                    currentLang,
+                    t,
+                    toggleLang,
                     serverStatus,
                     selectedFile,
                     isDragging,
