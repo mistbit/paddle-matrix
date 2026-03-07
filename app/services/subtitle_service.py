@@ -2,7 +2,7 @@
 
 import os
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict, Any, Tuple
 from pathlib import Path
 import re
 import numpy as np
@@ -132,13 +132,15 @@ class SubtitleService:
             all_detections = []
             processed_frames = 0
 
+            tracker_states = [self._create_tracker_state() for _ in anchors]
             for frame, timestamp, frame_idx in processor.extract_frames_by_interval(sample_interval):
                 processed_frames += 1
 
                 # Recognize in each anchor region
-                for anchor in anchors:
+                for anchor_idx, anchor in enumerate(anchors):
+                    tracker_state = tracker_states[anchor_idx]
                     # Refine anchor region
-                    region = self.detector.refine_anchor(anchor, frame)
+                    region = self._resolve_detection_region(anchor, frame, tracker_state)
 
                     # OCR recognition
                     ocr_lang = None
@@ -152,6 +154,13 @@ class SubtitleService:
                     merged_detection = self._merge_detections_in_frame(detections)
                     if not merged_detection:
                         continue
+                    optimized_box = self._self_optimize_box(
+                        merged_detection["box"],
+                        merged_detection["confidence"],
+                        tracker_state,
+                        frame.shape
+                    )
+                    merged_detection["box"] = optimized_box
 
                     detected_text = DetectedText(
                         text=merged_detection['text'],
@@ -306,3 +315,128 @@ class SubtitleService:
 
     def _needs_space(self, left_char: str, right_char: str) -> bool:
         return left_char.isalnum() and right_char.isalnum()
+
+    def _create_tracker_state(self) -> Dict[str, Any]:
+        return {"stable_box": None, "history": []}
+
+    def _resolve_detection_region(
+        self,
+        anchor: SubtitleAnchor,
+        frame: np.ndarray,
+        tracker_state: Dict[str, Any]
+    ) -> Tuple[int, int, int, int]:
+        base = self.detector.refine_anchor(anchor, frame)
+        stable = tracker_state.get("stable_box")
+        if stable is None:
+            return base
+
+        sh = max(1, stable[3] - stable[1])
+        sw = max(1, stable[2] - stable[0])
+        pad_x = max(30, int(sw * 0.45))
+        pad_y = max(20, int(sh * 0.9))
+        adaptive = (
+            stable[0] - pad_x,
+            stable[1] - pad_y,
+            stable[2] + pad_x,
+            stable[3] + pad_y
+        )
+        combined = (
+            min(base[0], adaptive[0]),
+            min(base[1], adaptive[1]),
+            max(base[2], adaptive[2]),
+            max(base[3], adaptive[3])
+        )
+        return self._clamp_box(combined, frame.shape)
+
+    def _self_optimize_box(
+        self,
+        raw_box: Tuple[int, int, int, int],
+        confidence: float,
+        tracker_state: Dict[str, Any],
+        frame_shape: Tuple[int, int, int]
+    ) -> Tuple[int, int, int, int]:
+        expanded = self._expand_box(raw_box, frame_shape)
+        stable = tracker_state.get("stable_box")
+
+        if stable is None:
+            candidate = expanded
+        else:
+            iou = self._box_iou(expanded, stable)
+            if iou >= 0.12:
+                alpha = 0.72 if confidence >= settings.SUBTITLE_MIN_CONFIDENCE else 0.5
+                candidate = tuple(
+                    int(round(alpha * expanded[i] + (1.0 - alpha) * stable[i]))
+                    for i in range(4)
+                )
+            elif confidence < settings.SUBTITLE_MIN_CONFIDENCE * 0.9:
+                candidate = stable
+            else:
+                candidate = expanded
+
+        candidate = self._clamp_box(candidate, frame_shape)
+        history = tracker_state["history"]
+        history.append(candidate)
+        if len(history) > 10:
+            history.pop(0)
+        tracker_state["stable_box"] = self._median_box(history)
+        return tracker_state["stable_box"]
+
+    def _expand_box(
+        self,
+        box: Tuple[int, int, int, int],
+        frame_shape: Tuple[int, int, int]
+    ) -> Tuple[int, int, int, int]:
+        x1, y1, x2, y2 = box
+        width = max(1, x2 - x1)
+        height = max(1, y2 - y1)
+        pad_x = max(6, int(width * 0.04))
+        pad_top = max(4, int(height * 0.3))
+        pad_bottom = max(4, int(height * 0.22))
+        expanded = (x1 - pad_x, y1 - pad_top, x2 + pad_x, y2 + pad_bottom)
+        return self._clamp_box(expanded, frame_shape)
+
+    def _median_box(self, boxes: List[Tuple[int, int, int, int]]) -> Tuple[int, int, int, int]:
+        arr = np.array(boxes, dtype=np.float64)
+        med = np.median(arr, axis=0)
+        return (
+            int(round(med[0])),
+            int(round(med[1])),
+            int(round(med[2])),
+            int(round(med[3]))
+        )
+
+    def _clamp_box(
+        self,
+        box: Tuple[int, int, int, int],
+        frame_shape: Tuple[int, int, int]
+    ) -> Tuple[int, int, int, int]:
+        h, w = frame_shape[:2]
+        x1, y1, x2, y2 = box
+        x1 = int(max(0, min(w - 1, x1)))
+        y1 = int(max(0, min(h - 1, y1)))
+        x2 = int(max(x1 + 1, min(w, x2)))
+        y2 = int(max(y1 + 1, min(h, y2)))
+        return (x1, y1, x2, y2)
+
+    def _box_iou(
+        self,
+        box_a: Tuple[int, int, int, int],
+        box_b: Tuple[int, int, int, int]
+    ) -> float:
+        ax1, ay1, ax2, ay2 = box_a
+        bx1, by1, bx2, by2 = box_b
+        ix1 = max(ax1, bx1)
+        iy1 = max(ay1, by1)
+        ix2 = min(ax2, bx2)
+        iy2 = min(ay2, by2)
+        iw = max(0, ix2 - ix1)
+        ih = max(0, iy2 - iy1)
+        inter = float(iw * ih)
+        if inter <= 0.0:
+            return 0.0
+        area_a = float(max(1, ax2 - ax1) * max(1, ay2 - ay1))
+        area_b = float(max(1, bx2 - bx1) * max(1, by2 - by1))
+        union = area_a + area_b - inter
+        if union <= 0.0:
+            return 0.0
+        return inter / union

@@ -149,10 +149,8 @@ class SubtitleMerger:
         # Select most frequent text
         best_text = max(text_counts.items(), key=lambda x: x[1])[0]
         best_text_detections = [det for det in group if det.text == best_text]
-        box_source = max(
-            best_text_detections if best_text_detections else group,
-            key=lambda det: det.confidence
-        )
+        box_source_detections = best_text_detections if best_text_detections else group
+        stable_box = self._compute_stable_box(box_source_detections)
 
         # Calculate average confidence
         avg_confidence = np.mean([d.confidence for d in group])
@@ -168,8 +166,36 @@ class SubtitleMerger:
             end_time=end_time,
             text=best_text,
             confidence=avg_confidence,
-            box=box_source.box
+            box=stable_box
         )
+
+    def _compute_stable_box(self, detections: List[DetectedText]) -> Tuple[int, int, int, int]:
+        if len(detections) == 1:
+            return detections[0].box
+
+        boxes = np.array([det.box for det in detections], dtype=np.float64)
+        confidence = np.array([max(0.01, det.confidence) for det in detections], dtype=np.float64)
+        top_conf = float(np.max(confidence))
+        mask = confidence >= top_conf * 0.8
+        selected = boxes[mask]
+        if selected.shape[0] == 0:
+            selected = boxes
+
+        med = np.median(selected, axis=0)
+        width = max(1.0, med[2] - med[0])
+        height = max(1.0, med[3] - med[1])
+        pad_x = max(2.0, width * 0.02)
+        pad_y = max(2.0, height * 0.2)
+
+        x1 = int(round(med[0] - pad_x))
+        y1 = int(round(med[1] - pad_y))
+        x2 = int(round(med[2] + pad_x))
+        y2 = int(round(med[3] + pad_y))
+        if x2 <= x1:
+            x2 = x1 + 1
+        if y2 <= y1:
+            y2 = y1 + 1
+        return (x1, y1, x2, y2)
 
     def _adjust_time_boundaries(self, subtitles: List[Subtitle]) -> List[Subtitle]:
         """

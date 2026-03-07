@@ -37,5 +37,9 @@ def test_merge_detected_texts_keeps_subtitle_box():
         DetectedText(text="next line", confidence=0.88, box=(130, 590, 520, 650), timestamp=4.0, frame_index=20),
     ])
     assert len(subtitles) == 2
-    assert subtitles[0].box == (120, 602, 700, 666)
+    x1, y1, x2, y2 = subtitles[0].box
+    assert 95 <= x1 <= 115
+    assert 585 <= y1 <= 605
+    assert 620 <= x2 <= 640
+    assert 662 <= y2 <= 680
     assert subtitles[1].box == (130, 590, 520, 650)
