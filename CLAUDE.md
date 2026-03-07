@@ -49,12 +49,12 @@ app/
 │   ├── video_processor.py   # OpenCV-based frame extraction
 │   ├── ocr_engine.py        # PaddleOCR wrapper
 │   ├── subtitle_detector.py # Anchor discovery mechanism
-│   ├── subtitle_merger.py   # Deduplication and timeline smoothing
+│   ├── subtitle_merger.py   # Deduplication, timeline smoothing, and debug data collection
 │   └── srt_generator.py     # SRT format output
 ├── models/
-│   ├── domain.py        # Dataclasses: SubtitleAnchor, Subtitle, DetectedText
-│   └── schemas.py       # Pydantic models for API request/response
-└── static/              # Web UI (index.html)
+│   ├── domain.py        # Dataclasses: SubtitleAnchor, Subtitle (w/ debug_info), DetectedText
+│   └── schemas.py       # Pydantic models for API: SubtitleItem (w/ debug_info)
+└── static/              # Web UI (index.html w/ debug panel)
 ```
 
 ## Key Algorithms
@@ -64,13 +64,14 @@ The `SubtitleDetector` class uses a multi-strategy pipeline:
 1. **Bottom ROI Priority**: Scans bottom 35% of frames first (covers ~90% of cases)
 2. **Global Scan**: Falls back to full-frame scanning if bottom ROI fails
 3. **Temporal Band Detection**: Uses morphological operations (Top-hat/Black-hat) when OCR finds nothing
-4. **Y-axis Clustering**: Groups text detections by vertical position to find stable regions
+4. **Y-axis Clustering & Padding**: Groups detections by vertical position; applies enhanced padding (`x_pad: 8%`, `y_pad: 30%`) to the stable region.
 
 ### Subtitle Merging
 The `SubtitleMerger` class:
 - Uses `SequenceMatcher` for text similarity (threshold: 0.8)
 - Implements confidence-weighted voting for text selection
 - Performs timeline smoothing and gap merging
+- Returns structured `debug_info` containing raw coordinates and processing metadata.
 
 ## Configuration
 
