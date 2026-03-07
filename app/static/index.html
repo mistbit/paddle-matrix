@@ -160,7 +160,7 @@
                          :style="{ left: box.left, top: box.top, width: box.width, height: box.height }"></div>
                     <div v-if="activeSubtitleText" class="subtitle-overlay-text">{{ activeSubtitleText }}</div>
                 </div>
-                <p class="text-xs text-gray-500 mt-3">绿色框优先跟随当前字幕检测框变化，无法匹配时回退到自动检测区域。</p>
+                <p class="text-xs text-gray-500 mt-3">绿色框仅在当前时间命中字幕且存在检测框时显示。</p>
                 <p class="text-xs mt-1" :class="overlayDebugInfo.usingDynamic ? 'text-green-600' : 'text-amber-600'">
                     调试：{{ overlayDebugInfo.message }}
                 </p>
@@ -594,20 +594,7 @@
                     if (dynamicBox) {
                         return [dynamicBox];
                     }
-
-                    const anchors = currentTask.value?.result?.anchors || [];
-                    return anchors.map(anchor => {
-                        const left = Math.max(0, (anchor.center_x - anchor.width / 2) * 100);
-                        const top = Math.max(0, (anchor.center_y - anchor.height / 2) * 100);
-                        const width = Math.min(100, anchor.width * 100);
-                        const height = Math.min(100, anchor.height * 100);
-                        return {
-                            left: `${left.toFixed(2)}%`,
-                            top: `${top.toFixed(2)}%`,
-                            width: `${width.toFixed(2)}%`,
-                            height: `${height.toFixed(2)}%`
-                        };
-                    });
+                    return [];
                 });
 
                 const activeSubtitleText = computed(() => {
@@ -636,7 +623,7 @@
                     if (active && !hasActiveBox) {
                         return {
                             usingDynamic: false,
-                            message: `回退锚框（字幕#${active.index}缺少box）`
+                            message: `字幕#${active.index}缺少box，当前不显示绿色框`
                         };
                     }
                     if (!subtitles.length && !anchors.length) {
@@ -653,7 +640,7 @@
                     }
                     return {
                         usingDynamic: false,
-                        message: `当前时间未命中字幕，使用锚框显示（box=${boxCount}/${subtitles.length}）`
+                        message: `当前时间未命中字幕，不显示绿色框（box=${boxCount}/${subtitles.length}）`
                     };
                 });
 
