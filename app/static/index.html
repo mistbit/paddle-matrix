@@ -145,9 +145,22 @@
             <div v-if="videoPreviewUrl" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-semibold text-gray-900">视频预览与字幕框</h2>
-                    <span class="text-sm text-gray-500">
-                        {{ formatSrtTime(videoState.currentTime) }} / {{ formatSrtTime(videoState.duration || 0) }}
-                    </span>
+                    <div class="flex items-center space-x-4">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <span class="text-sm text-gray-600">显示字幕</span>
+                            <button @click="showSubtitle = !showSubtitle"
+                                    type="button"
+                                    class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                    :class="showSubtitle ? 'bg-blue-600' : 'bg-gray-200'"
+                                    role="switch" :aria-checked="showSubtitle">
+                                <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                      :class="showSubtitle ? 'translate-x-5' : 'translate-x-0'"></span>
+                            </button>
+                        </label>
+                        <span class="text-sm text-gray-500">
+                            {{ formatSrtTime(videoState.currentTime) }} / {{ formatSrtTime(videoState.duration || 0) }}
+                        </span>
+                    </div>
                 </div>
                 <div class="video-stage">
                     <video ref="videoPlayer"
@@ -159,7 +172,7 @@
                     <div v-for="(box, idx) in overlayBoxes" :key="idx"
                          class="subtitle-box"
                          :style="{ left: box.left, top: box.top, width: box.width, height: box.height }"></div>
-                    <div v-if="activeSubtitleText" class="subtitle-overlay-text">{{ activeSubtitleText }}</div>
+                    <div v-if="activeSubtitleText && showSubtitle" class="subtitle-overlay-text">{{ activeSubtitleText }}</div>
                 </div>
                 <p class="text-xs text-gray-500 mt-3">绿色框仅在当前时间命中字幕且存在检测框时显示。</p>
                 <p class="text-xs mt-1" :class="overlayDebugInfo.usingDynamic ? 'text-green-600' : 'text-amber-600'">
@@ -345,6 +358,8 @@
                     duration: 0,
                     currentTime: 0
                 });
+
+                const showSubtitle = ref(true); // 字幕显示开关
 
                 const options = reactive({
                     language: 'auto',
@@ -751,6 +766,7 @@
                     videoPreviewUrl,
                     videoPlayer,
                     videoState,
+                    showSubtitle,
                     overlayBoxes,
                     overlayDebugInfo,
                     activeSubtitleText,
