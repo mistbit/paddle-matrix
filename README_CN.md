@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" width="200" alt="Paddle Matrix Logo">
+</p>
+
 # Paddle Matrix - 视频字幕 OCR 服务
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
