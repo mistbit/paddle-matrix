@@ -6,6 +6,8 @@
 
 [English](README.md)
 
+![Web UI 界面](ui.png)
+
 **Paddle Matrix** 是一个基于 [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) 的高性能 HTTP 服务，专为从视频中提取硬字幕并生成标准的 SRT 字幕文件而设计。它提供了强大的视频字幕提取 API，支持多种语言和主流视频格式。
 
 ## ✨ 功能特性

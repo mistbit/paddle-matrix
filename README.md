@@ -6,6 +6,8 @@
 
 [中文文档](README_CN.md)
 
+![Web UI Interface](ui.png)
+
 **Paddle Matrix** is a high-performance HTTP service powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) designed to extract hardcoded subtitles from videos and generate standard SRT subtitle files. It provides a robust API for video subtitle extraction with support for multiple languages and video formats.
 
 ## ✨ Features
