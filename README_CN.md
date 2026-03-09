@@ -37,6 +37,7 @@
 - **🔍 详细调试信息**：集成调试信息（原始 OCR 数据、内边距、原始框坐标）并直接在 Web UI 中展示，方便排查识别异常。
 - **🐳 Docker 支持**：使用 Docker 和 Docker Compose 一键部署。
 - **🖥️ Web 界面**：内置简单的 Web 界面，支持上传视频并带有交互式调试面板。
+- **🍎 macOS 独立应用**：可构建原生 macOS 应用，内嵌 Python 运行时和 OCR 模型，无需安装依赖。
 
 ## 🚀 快速开始
 
@@ -54,6 +55,33 @@ docker-compose up -d
 ```
 
 服务启动后访问地址：`http://localhost:8000`。
+
+### 🍎 macOS 独立应用
+
+macOS 用户可以构建独立应用，无需安装 Python 或任何依赖即可运行。
+
+**前置要求:**
+- Python 3.10（仅构建时需要）
+- Homebrew OpenSSL: `brew install openssl@3`
+
+**构建与运行:**
+
+```bash
+# 构建 macOS 应用
+./build_app.sh
+
+# 运行应用
+open "dist/Paddle Matrix.app"
+
+# 或安装到应用程序文件夹
+cp -r "dist/Paddle Matrix.app" /Applications/
+```
+
+应用包含：
+- ✅ Python 3.10 运行时
+- ✅ 所有依赖库（FastAPI、PaddleOCR、OpenCV 等）
+- ✅ 预集成的 OCR 模型（首次运行无需下载）
+- ✅ 原生桌面窗口
 
 ### 🐍 本地安装
 
