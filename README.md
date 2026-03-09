@@ -37,6 +37,7 @@
 - **🔍 Detailed Debug Info**: Integrated debug info (raw OCR data, padding, original boxes) displayed in the Web UI for troubleshooting.
 - **🐳 Docker Ready**: One-click deployment using Docker and Docker Compose.
 - **🖥️ Web UI**: Includes a simple built-in web interface for file uploads and testing with interactive debug panel.
+- **🍎 macOS Standalone App**: Build a native macOS application with bundled Python runtime and OCR models.
 
 ## 🚀 Quick Start
 
@@ -54,6 +55,33 @@ docker-compose up -d
 ```
 
 The service will be available at `http://localhost:8000`.
+
+### 🍎 macOS Standalone App
+
+For macOS users, you can build a standalone application that runs without installing Python or any dependencies.
+
+**Prerequisites:**
+- Python 3.10 (for building only)
+- Homebrew OpenSSL: `brew install openssl@3`
+
+**Build & Run:**
+
+```bash
+# Build the macOS app
+./build_app.sh
+
+# Run the app
+open "dist/Paddle Matrix.app"
+
+# Or install to Applications
+cp -r "dist/Paddle Matrix.app" /Applications/
+```
+
+The app includes:
+- ✅ Python 3.10 runtime
+- ✅ All dependencies (FastAPI, PaddleOCR, OpenCV, etc.)
+- ✅ Pre-bundled OCR models (no download on first run)
+- ✅ Native desktop window
 
 ### 🐍 Local Installation
 
